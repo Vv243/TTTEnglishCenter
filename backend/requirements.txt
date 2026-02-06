@@ -1,0 +1,36 @@
+# Core Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart
+
+# Database
+sqlalchemy>=2.0.25
+alembic>=1.13.1
+psycopg2-binary
+asyncpg
+
+# Data Validation (use latest with pre-built wheels)
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+
+# Data Processing
+pandas
+numpy
+
+# Background Tasks
+celery>=5.3.6
+redis>=5.0.1
+
+# Authentication
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Utilities
+python-dotenv
+pytz
+twilio
+python-constraint
+
+# ML packages (optional for now)
+# scikit-learn
+# prophet
