@@ -1,26 +1,61 @@
-"""
-TTTEnglishCenter API
-FastAPI backend for learning management system
-"""
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import os
+from dotenv import load_dotenv
 
+from app.api import api_router
+from app.database import engine
+
+load_dotenv()
+
+# Lifespan events (startup/shutdown)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    print("🚀 Starting TTTEnglishCenter API...")
+    print(f"📊 Database: Connected to port 5433")
+    yield
+    # Shutdown
+    print("👋 Shutting down TTTEnglishCenter API...")
+    await engine.dispose()
+
+# Create FastAPI app
 app = FastAPI(
     title="TTTEnglishCenter API",
-    description="Learning management platform for Vietnamese English tutoring",
-    version="0.1.0"
+    description="Backend API for Vietnamese English Tutoring Center Management System",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include API routes
+app.include_router(api_router, prefix="/api/v1")
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "TTTEnglishCenter API",
+        "version": "1.0.0"
+    }
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
-    return {"status": "ok", "message": "TTTEnglishCenter API is running"}
-
-
-@app.get("/health")
-async def health():
-    """Detailed health check"""
     return {
-        "status": "healthy",
-        "version": "0.1.0"
+        "message": "Welcome to TTTEnglishCenter API",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "health": "/health"
     }

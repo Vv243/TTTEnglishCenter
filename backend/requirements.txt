@@ -12,6 +12,7 @@ asyncpg
 # Data Validation (use latest with pre-built wheels)
 pydantic>=2.10.0
 pydantic-settings>=2.7.0
+email-validator>=2.1.0  # ← Add this line
 
 # Data Processing
 pandas
