@@ -33,7 +33,8 @@ class Teacher(Base, TimestampMixin):
     last_login_at = Column(DateTime(timezone=True))
     
     # Relationships (we'll add these later when we create other models)
-    # classes = relationship("Class", back_populates="teacher", foreign_keys="Class.teacher_id")
+    classes = relationship("Class", back_populates="teacher", foreign_keys="Class.teacher_id")
+    assistant_classes = relationship("Class", back_populates="assistant_teacher", foreign_keys="Class.assistant_teacher_id")
     
     def __repr__(self):
         return f"<Teacher(id={self.id}, name={self.full_name}, role={self.role})>"
