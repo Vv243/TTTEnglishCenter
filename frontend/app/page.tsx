@@ -18,8 +18,8 @@ export default function DashboardPage() {
           statsAPI.getSummary(),
           statsAPI.getDashboard(),
         ]);
-        setSummary(summaryData);
-        setDashboard(dashboardData);
+        setSummary(summaryData.data);
+        setDashboard(dashboardData.data);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
