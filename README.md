@@ -160,88 +160,59 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Python 3.11+**
-- **Node.js 18+**
-- **Docker Desktop**
-- **Git**
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Python 3.11+](https://www.python.org/downloads/)
+- [Node.js 18+](https://nodejs.org/)
+- [Git](https://git-scm.com/)
 
-### 1. Clone Repository
+### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/TTTEnglishCenter.git
+git clone https://github.com/YOUR_USERNAME/TTTEnglishCenter.git
 cd TTTEnglishCenter
 ```
 
-### 2. Start Database (Docker)
+### 2. Run Setup Script
+
+**Mac/Linux:**
 ```bash
-# Start PostgreSQL + Redis + pgAdmin
-docker-compose up -d
-
-# Verify containers are running
-docker-compose ps
-
-# Check database was seeded
-docker-compose logs postgres | findstr "Teachers"
-# Expected output: NOTICE:  Teachers: 3
+chmod +x setup.sh
+./setup.sh
 ```
 
-### 3. Backend Setup
+**Windows (PowerShell):**
+```powershell
+.\setup.ps1
+```
+
+That's it! The script will:
+- ✅ Check all prerequisites
+- ✅ Start Docker services (PostgreSQL, Redis, pgAdmin)
+- ✅ Create Python virtual environment
+- ✅ Install all dependencies
+- ✅ Create `.env` files from templates
+
+### 3. Start the Application
+
+**Backend** (Terminal 1):
 ```bash
 cd backend
-
-# Create virtual environment
-python -m venv venv
-
-# Activate (Windows)
-.\venv\Scripts\activate
-
-# Activate (Mac/Linux)
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create .env file from example
-cp .env.example .env
-# Edit .env and update values if needed
-
-# Run server
+source venv/bin/activate        # Mac/Linux
+# .\venv\Scripts\activate       # Windows
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Backend running:** http://localhost:8000/docs
-
-### 4. Frontend Setup
+**Frontend** (Terminal 2):
 ```bash
 cd frontend
-
-# Install dependencies
-npm install
-
-# Verify .env.local exists with:
-# NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-
-# Run dev server
 npm run dev
 ```
 
-**Frontend running:** http://localhost:3000
-
-### 5. Access the Application
-
-**Frontend (Main UI):**
-- Dashboard: http://localhost:3000
-- Teachers: http://localhost:3000/teachers
-- Students: http://localhost:3000/students
-- Classes: http://localhost:3000/classes
-- Enrollments: http://localhost:3000/enrollments
-
-**Backend (API Docs):**
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-**Database Admin:**
-- pgAdmin: http://localhost:5050
-- Login: admin@example.com / admin
+### 4. Open the App
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| API Docs | http://localhost:8000/docs |
+| pgAdmin | http://localhost:5050 |
 
 ---
 
