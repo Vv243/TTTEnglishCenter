@@ -8,11 +8,12 @@ sqlalchemy>=2.0.25
 alembic>=1.13.1
 psycopg2-binary
 asyncpg
+greenlet
 
-# Data Validation (use latest with pre-built wheels)
+# Data Validation
 pydantic>=2.10.0
 pydantic-settings>=2.7.0
-email-validator>=2.1.0  # ← Add this line
+email-validator>=2.1.0
 
 # Data Processing
 pandas
@@ -32,6 +33,6 @@ pytz
 twilio
 python-constraint
 
-# ML packages (optional for now)
+# ML packages (uncomment when ready for Days 6-9)
 # scikit-learn
 # prophet
