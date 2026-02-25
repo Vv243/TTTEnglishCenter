@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { statsAPI } from "@/lib/api";
 import type { StatsSummary, DashboardStats } from "@/types";
 import { Users, GraduationCap, BookOpen, UserCircle } from "lucide-react";
@@ -18,8 +24,8 @@ export default function DashboardPage() {
           statsAPI.getSummary(),
           statsAPI.getDashboard(),
         ]);
-        setSummary(summaryData.data);
-        setDashboard(dashboardData.data);
+        setSummary(summaryData);
+        setDashboard(dashboardData);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
@@ -101,7 +107,9 @@ export default function DashboardPage() {
                       {stat.value}
                     </p>
                   </div>
-                  <div className={`${stat.bgColor} ${stat.color} p-3 rounded-lg`}>
+                  <div
+                    className={`${stat.bgColor} ${stat.color} p-3 rounded-lg`}
+                  >
                     <Icon className="h-6 w-6" />
                   </div>
                 </div>
@@ -117,14 +125,19 @@ export default function DashboardPage() {
         <Card className="animate-fade-in animate-delay-400">
           <CardHeader>
             <CardTitle>Payment Clusters</CardTitle>
-            <CardDescription>Student payment behavior distribution</CardDescription>
+            <CardDescription>
+              Student payment behavior distribution
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {dashboard?.payment_cluster_distribution &&
-                Object.entries(dashboard.payment_cluster_distribution).map(
+              {dashboard?.students?.payment_clusters &&
+                Object.entries(dashboard.students.payment_clusters).map(
                   ([cluster, count]) => (
-                    <div key={cluster} className="flex items-center justify-between">
+                    <div
+                      key={cluster}
+                      className="flex items-center justify-between"
+                    >
                       <div className="flex items-center gap-3">
                         <div className="h-3 w-3 rounded-full bg-amber-500" />
                         <span className="text-sm font-medium capitalize text-slate-700">
@@ -132,10 +145,10 @@ export default function DashboardPage() {
                         </span>
                       </div>
                       <span className="text-sm font-mono font-semibold text-slate-900">
-                        {count}
+                        {count as number}
                       </span>
                     </div>
-                  )
+                  ),
                 )}
             </div>
           </CardContent>
@@ -149,32 +162,27 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {dashboard?.enrollment_status_distribution &&
-                Object.entries(dashboard.enrollment_status_distribution).map(
-                  ([status, count]) => (
-                    <div key={status} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`h-3 w-3 rounded-full ${
-                            status === "active"
-                              ? "bg-green-500"
-                              : status === "completed"
-                              ? "bg-blue-500"
-                              : status === "dropped"
-                              ? "bg-red-500"
-                              : "bg-gray-500"
-                          }`}
-                        />
-                        <span className="text-sm font-medium capitalize text-slate-700">
-                          {status}
-                        </span>
-                      </div>
-                      <span className="text-sm font-mono font-semibold text-slate-900">
-                        {count}
+              {dashboard?.enrollments &&
+                Object.entries(dashboard.enrollments).map(([status, count]) => (
+                  <div
+                    key={status}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`h-3 w-3 rounded-full ${
+                          status === "active" ? "bg-green-500" : "bg-blue-500"
+                        }`}
+                      />
+                      <span className="text-sm font-medium capitalize text-slate-700">
+                        {status}
                       </span>
                     </div>
-                  )
-                )}
+                    <span className="text-sm font-mono font-semibold text-slate-900">
+                      {count as number}
+                    </span>
+                  </div>
+                ))}
             </div>
           </CardContent>
         </Card>
@@ -197,7 +205,8 @@ export default function DashboardPage() {
                   {teacher.teacher_name}
                 </span>
                 <span className="text-sm font-mono font-semibold text-slate-900">
-                  {teacher.class_count} {teacher.class_count === 1 ? "class" : "classes"}
+                  {teacher.class_count}{" "}
+                  {teacher.class_count === 1 ? "class" : "classes"}
                 </span>
               </div>
             ))}

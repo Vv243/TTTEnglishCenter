@@ -6,7 +6,7 @@ export interface Teacher {
   phone: string | null;
   zalo_id: string | null;
   whatsapp_number: string | null;
-  role: 'admin' | 'teacher' | 'assistant';
+  role: "admin" | "teacher" | "assistant";
   specializations: string[];
   is_active: boolean;
   created_at: string;
@@ -14,13 +14,26 @@ export interface Teacher {
 }
 
 // Student types
-export type GradeLevel = 
-  | 'primary_1' | 'primary_2' | 'primary_3' | 'primary_4' | 'primary_5'
-  | 'secondary_6' | 'secondary_7' | 'secondary_8' | 'secondary_9'
-  | 'high_10' | 'high_11' | 'high_12';
+export type GradeLevel =
+  | "primary_1"
+  | "primary_2"
+  | "primary_3"
+  | "primary_4"
+  | "primary_5"
+  | "secondary_6"
+  | "secondary_7"
+  | "secondary_8"
+  | "secondary_9"
+  | "high_10"
+  | "high_11"
+  | "high_12";
 
-export type PaymentCluster = 
-  | 'new_student' | 'always_on_time' | 'needs_reminder' | 'high_risk' | 'erratic';
+export type PaymentCluster =
+  | "new_student"
+  | "always_on_time"
+  | "needs_reminder"
+  | "high_risk"
+  | "erratic";
 
 export interface Student {
   id: string;
@@ -50,16 +63,31 @@ export interface Student {
 }
 
 // Class types
-export type ClassLevel = 
-  | 'primary_1' | 'primary_2' | 'primary_3' | 'primary_4' | 'primary_5'
-  | 'secondary_6' | 'secondary_7' | 'secondary_8' | 'secondary_9'
-  | 'high_10' | 'high_11' | 'high_12'
-  | 'starters' | 'movers' | 'flyers'
-  | 'ket' | 'pet' | 'fce'
-  | 'ielts' | 'toefl' | 'sat'
-  | 'general_english';
+export type ClassLevel =
+  | "primary_1"
+  | "primary_2"
+  | "primary_3"
+  | "primary_4"
+  | "primary_5"
+  | "secondary_6"
+  | "secondary_7"
+  | "secondary_8"
+  | "secondary_9"
+  | "high_10"
+  | "high_11"
+  | "high_12"
+  | "starters"
+  | "movers"
+  | "flyers"
+  | "ket"
+  | "pet"
+  | "fce"
+  | "ielts"
+  | "toefl"
+  | "sat"
+  | "general_english";
 
-export type ClassStatus = 'scheduled' | 'active' | 'completed' | 'cancelled';
+export type ClassStatus = "scheduled" | "active" | "completed" | "cancelled";
 
 export interface Class {
   id: string;
@@ -91,8 +119,12 @@ export interface Class {
 }
 
 // Enrollment types
-export type EnrollmentStatus = 
-  | 'active' | 'dropped' | 'completed' | 'suspended' | 'waitlisted';
+export type EnrollmentStatus =
+  | "active"
+  | "dropped"
+  | "completed"
+  | "suspended"
+  | "waitlisted";
 
 export interface Enrollment {
   id: string;
@@ -131,10 +163,15 @@ export interface StatsSummary {
 
 export interface DashboardStats {
   summary: StatsSummary;
-  payment_cluster_distribution: Record<PaymentCluster, number>;
-  class_level_distribution: Record<string, number>;
-  enrollment_status_distribution: Record<EnrollmentStatus, number>;
-  teacher_class_count: Array<{ teacher_name: string; class_count: number }>;
+  teachers: { total: number; active: number };
+  students: {
+    total: number;
+    active: number;
+    payment_clusters: Record<PaymentCluster, number>;
+  };
+  classes: { total: number; by_status: Record<ClassStatus, number> };
+  enrollments: { total: number; active: number };
+  teacher_class_count: Array<{ teacher_name: string; class_count: number }>; // ← add this
 }
 
 // API Response types
