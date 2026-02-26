@@ -230,7 +230,7 @@ export default function EnrollmentsPage() {
                       {enrollment.average_score !== null ? (
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="text-lg font-bold font-mono text-slate-900">{enrollment.average_score.toFixed(1)}</span>
+                            <span className="text-lg font-bold font-mono text-slate-900">{Number(enrollment.average_score).toFixed(1)}</span>
                             <span className="text-xs text-slate-500">avg</span>
                           </div>
                           {enrollment.progress_trend && (

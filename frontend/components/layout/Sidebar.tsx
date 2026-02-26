@@ -9,6 +9,7 @@ import {
   GraduationCap,
   BookOpen,
   UserCircle,
+  Brain,
 } from "lucide-react";
 
 const navigation = [
@@ -36,6 +37,11 @@ const navigation = [
     name: "Enrollments",
     href: "/enrollments",
     icon: UserCircle,
+  },
+  {
+    name: "ML Insights",
+    href: "/ml",
+    icon: Brain,
   },
 ];
 
