@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 from app.api import api_router
 from app.database import engine
+from app.api.ml import router as ml_router
 
 load_dotenv()
 
@@ -59,3 +60,4 @@ async def root():
         "redoc": "/redoc",
         "health": "/health"
     }
+
