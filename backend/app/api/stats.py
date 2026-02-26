@@ -133,7 +133,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)) -> Dict[str, A
         },
         "enrollments": {
             "total": summary_result["active_enrollments"],
-            "active": summary_result["active_enrollments"]
+            "active": summary_result["active_enrollments"],
         },
-        "teacher_class_count": teacher_class_count
+        "teacher_class_count": teacher_class_count,
     }

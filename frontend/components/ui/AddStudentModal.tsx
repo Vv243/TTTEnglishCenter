@@ -8,7 +8,7 @@ import { studentsAPI } from "@/lib/api";
 interface AddStudentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void; // triggers refetch in parent
+  onSuccess: () => void;
 }
 
 const GRADE_LEVELS = [
@@ -24,14 +24,45 @@ const GRADE_LEVELS = [
   { value: "high_10", label: "High 10" },
   { value: "high_11", label: "High 11" },
   { value: "high_12", label: "High 12" },
+  { value: "adult", label: "Adult Learner" },
 ];
 
-const HCM_DISTRICTS = [
-  "Quận 1", "Quận 2", "Quận 3", "Quận 4", "Quận 5",
-  "Quận 6", "Quận 7", "Quận 8", "Quận 9", "Quận 10",
-  "Quận 11", "Quận 12", "Bình Thạnh", "Gò Vấp", "Phú Nhuận",
-  "Tân Bình", "Tân Phú", "Thủ Đức", "Bình Tân", "Hóc Môn",
-  "Củ Chi", "Bình Chánh", "Nhà Bè", "Cần Giờ",
+// All 34 provinces/cities as of July 1, 2025
+const VIETNAM_PROVINCES = [
+  "TP. Hồ Chí Minh",
+  "Hà Nội",
+  "Đà Nẵng",
+  "Hải Phòng",
+  "Cần Thơ",
+  "Huế",
+  "An Giang",
+  "Bắc Ninh",
+  "Bình Định",
+  "Cao Bằng",
+  "Cà Mau",
+  "Đắk Lắk",
+  "Điện Biên",
+  "Đồng Nai",
+  "Đồng Tháp",
+  "Gia Lai",
+  "Hà Tĩnh",
+  "Hưng Yên",
+  "Khánh Hòa",
+  "Lai Châu",
+  "Lâm Đồng",
+  "Lạng Sơn",
+  "Lào Cai",
+  "Nghệ An",
+  "Ninh Bình",
+  "Phú Thọ",
+  "Quảng Ngãi",
+  "Quảng Ninh",
+  "Quảng Trị",
+  "Sơn La",
+  "Tây Ninh",
+  "Thanh Hóa",
+  "Thái Nguyên",
+  "Vĩnh Long",
 ];
 
 interface FormData {
@@ -42,8 +73,10 @@ interface FormData {
   parent_phone: string;
   parent_email: string;
   parent_zalo: string;
-  district: string;
-  address: string;
+  province_city: string;
+  province_city_custom: string; // for "other" free text
+  ward: string;
+  street_address: string;
   notes: string;
 }
 
@@ -55,8 +88,10 @@ const INITIAL_FORM: FormData = {
   parent_phone: "",
   parent_email: "",
   parent_zalo: "",
-  district: "",
-  address: "",
+  province_city: "TP. Hồ Chí Minh",
+  province_city_custom: "",
+  ward: "",
+  street_address: "",
   notes: "",
 };
 
@@ -72,23 +107,26 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStude
 
   if (!isOpen) return null;
 
+  const isCustomProvince = form.province_city === "__other__";
+
   const set = (field: keyof FormData, value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
-    // Clear error on change
     if (errors[field]) setErrors((e) => { const n = { ...e }; delete n[field]; return n; });
   };
 
   const validate = (): boolean => {
     const newErrors: FieldErrors = {};
-    if (!form.full_name.trim())   newErrors.full_name   = "Student name is required";
-    if (!form.date_of_birth)      newErrors.date_of_birth = "Date of birth is required";
-    if (!form.grade_level)        newErrors.grade_level  = "Grade level is required";
-    if (!form.parent_name.trim()) newErrors.parent_name  = "Parent name is required";
-    if (!form.parent_phone.trim()) newErrors.parent_phone = "Parent phone is required";
+    if (!form.full_name.trim())    newErrors.full_name    = "Student name is required";
+    if (!form.date_of_birth)       newErrors.date_of_birth = "Date of birth is required";
+    if (!form.grade_level)         newErrors.grade_level   = "Grade level is required";
+    if (!form.parent_name.trim())  newErrors.parent_name   = "Parent name is required";
+    if (!form.parent_phone.trim()) newErrors.parent_phone  = "Parent phone is required";
     else if (!/^[0-9+\-\s]{7,15}$/.test(form.parent_phone.trim()))
       newErrors.parent_phone = "Enter a valid phone number";
     if (form.parent_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.parent_email))
       newErrors.parent_email = "Enter a valid email address";
+    if (isCustomProvince && !form.province_city_custom.trim())
+      newErrors.province_city_custom = "Please enter the province/city name";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -97,19 +135,24 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStude
     if (!validate()) return;
     setSubmitting(true);
     setServerError("");
+
+    const finalProvince = isCustomProvince
+      ? form.province_city_custom.trim()
+      : form.province_city;
+
     try {
       await studentsAPI.create({
-        full_name:    form.full_name.trim(),
+        full_name:     form.full_name.trim(),
         date_of_birth: form.date_of_birth,
-        grade_level:  form.grade_level,
-        parent_name:  form.parent_name.trim(),
-        parent_phone: form.parent_phone.trim(),
-        parent_email: form.parent_email.trim() || null,
-        parent_zalo:  form.parent_zalo.trim() || null,
-        district:     form.district || null,
-        address:      form.address.trim() || null,
-        notes:        form.notes.trim() || null,
-        city:         "Ho Chi Minh City",
+        grade_level:   form.grade_level,
+        parent_name:   form.parent_name.trim(),
+        parent_phone:  form.parent_phone.trim(),
+        parent_email:  form.parent_email.trim() || null,
+        parent_zalo:   form.parent_zalo.trim() || null,
+        province_city: finalProvince || null,
+        ward:          form.ward.trim() || null,
+        street_address: form.street_address.trim() || null,
+        notes:         form.notes.trim() || null,
         payment_cluster: "new_student",
       });
       setForm(INITIAL_FORM);
@@ -138,10 +181,8 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStude
 
   return (
     <>
-      {/* Backdrop */}
       <div className="fixed inset-0 bg-black/40 z-40" onClick={handleClose} />
 
-      {/* Slide-in panel */}
       <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl z-50 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
@@ -154,23 +195,21 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStude
           </button>
         </div>
 
-        {/* Form body - scrollable */}
+        {/* Form body */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
 
-          {/* Server error */}
           {serverError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
               {serverError}
             </div>
           )}
 
-          {/* Section: Student Info */}
+          {/* Student Info */}
           <div>
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               Student Information
             </h3>
             <div className="space-y-4">
-              {/* Full Name */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Full Name <span className="text-red-500">*</span>
@@ -185,7 +224,6 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStude
                 {errors.full_name && <p className="text-xs text-red-500 mt-1">{errors.full_name}</p>}
               </div>
 
-              {/* DOB + Grade Level */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -219,7 +257,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStude
             </div>
           </div>
 
-          {/* Section: Parent Contact */}
+          {/* Parent Contact */}
           <div>
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               Parent / Guardian Contact
@@ -279,39 +317,81 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStude
             </div>
           </div>
 
-          {/* Section: Location */}
+          {/* Address — Vietnam 2-tier system */}
           <div>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Location
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+              Address
             </h3>
+            <p className="text-xs text-slate-400 mb-3">
+              Vietnam address format (post July 2025): Street → Ward → Province/City
+            </p>
             <div className="space-y-4">
+
+              {/* Province/City dropdown */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">District</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Province / City
+                </label>
                 <select
-                  value={form.district}
-                  onChange={(e) => set("district", e.target.value)}
-                  className={inputClass("district")}
+                  value={form.province_city}
+                  onChange={(e) => set("province_city", e.target.value)}
+                  className={inputClass("province_city")}
                 >
-                  <option value="">Select district...</option>
-                  {HCM_DISTRICTS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
+                  {VIETNAM_PROVINCES.map((p) => (
+                    <option key={p} value={p}>{p}</option>
                   ))}
+                  <option value="__other__">Other (type manually)...</option>
                 </select>
+
+                {/* Free text fallback */}
+                {isCustomProvince && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      placeholder="Type province/city name..."
+                      value={form.province_city_custom}
+                      onChange={(e) => set("province_city_custom", e.target.value)}
+                      className={inputClass("province_city_custom")}
+                    />
+                    {errors.province_city_custom && (
+                      <p className="text-xs text-red-500 mt-1">{errors.province_city_custom}</p>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Ward */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Ward / Phường / Xã
+                </label>
                 <input
                   type="text"
-                  placeholder="Street address"
-                  value={form.address}
-                  onChange={(e) => set("address", e.target.value)}
-                  className={inputClass("address")}
+                  placeholder="e.g. Phường Đa Kao, Xã Châu Phú A..."
+                  value={form.ward}
+                  onChange={(e) => set("ward", e.target.value)}
+                  className={inputClass("ward")}
                 />
               </div>
+
+              {/* Street address */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Street Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 45A Nguyễn Đình Chiểu..."
+                  value={form.street_address}
+                  onChange={(e) => set("street_address", e.target.value)}
+                  className={inputClass("street_address")}
+                />
+              </div>
+
             </div>
           </div>
 
-          {/* Section: Notes */}
+          {/* Notes */}
           <div>
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               Additional Notes

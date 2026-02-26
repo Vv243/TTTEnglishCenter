@@ -14,14 +14,14 @@ interface Filters {
   search: string;
   grade_level: string;
   payment_cluster: string;
-  district: string;
+  province_city: string;
 }
 
 const INITIAL_FILTERS: Filters = {
   search: "",
   grade_level: "",
   payment_cluster: "",
-  district: "",
+  province_city: "",
 };
 
 const GRADE_LEVELS = [
@@ -49,6 +49,15 @@ const PAYMENT_CLUSTERS = [
   { value: "erratic", label: "Erratic" },
 ];
 
+const VIETNAM_PROVINCES = [
+  "TP. Hồ Chí Minh", "Hà Nội", "Đà Nẵng", "Hải Phòng", "Cần Thơ", "Huế",
+  "An Giang", "Bắc Ninh", "Bình Định", "Cao Bằng", "Cà Mau", "Đắk Lắk",
+  "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Tĩnh", "Hưng Yên",
+  "Khánh Hòa", "Lai Châu", "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Nghệ An",
+  "Ninh Bình", "Phú Thọ", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị",
+  "Sơn La", "Tây Ninh", "Thanh Hóa", "Thái Nguyên", "Vĩnh Long",
+];
+
 // ---------- Helpers ----------
 const getPaymentClusterColor = (cluster: string) => {
   switch (cluster) {
@@ -66,21 +75,26 @@ const formatGradeLevel = (level: string | null) => {
   return level.replace("_", " ").toUpperCase();
 };
 
+const formatAddress = (student: Student) => {
+  const parts = [student.ward, student.province_city].filter(Boolean);
+  return parts.length > 0 ? parts : null;
+};
+
 // ---------- Component ----------
 export default function StudentsPage() {
   const [data, setData] = useState<PaginatedResponse<Student> | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
-  const [searchInput, setSearchInput] = useState(""); // local input before debounce
+  const [searchInput, setSearchInput] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const perPage = 10;
 
-  // Debounce search input → filters.search
+  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilters((f) => ({ ...f, search: searchInput }));
-      setPage(1); // reset to page 1 on new search
+      setPage(1);
     }, 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
@@ -94,12 +108,9 @@ export default function StudentsPage() {
         is_active: true,
       };
 
-      // Only send non-empty filters
-      if (filters.grade_level)    params.grade_level    = filters.grade_level;
+      if (filters.grade_level)     params.grade_level     = filters.grade_level;
       if (filters.payment_cluster) params.payment_cluster = filters.payment_cluster;
-      if (filters.district)       params.district       = filters.district;
-      // Note: backend doesn't have a name search param yet, so we filter client-side
-      // (we'll add backend search in a later day when we expand the API)
+      if (filters.province_city)   params.province_city   = filters.province_city;
 
       const result = await studentsAPI.getAll(params);
       setData(result);
@@ -108,13 +119,13 @@ export default function StudentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters.grade_level, filters.payment_cluster, filters.district]);
+  }, [page, filters.grade_level, filters.payment_cluster, filters.province_city]);
 
   useEffect(() => {
     fetchStudents();
   }, [fetchStudents]);
 
-  // Client-side name search (since backend doesn't support it yet)
+  // Client-side name search
   const students = (data?.items || []).filter((s) => {
     if (!filters.search) return true;
     const q = filters.search.toLowerCase();
@@ -125,7 +136,7 @@ export default function StudentsPage() {
   });
 
   const hasActiveFilters =
-    filters.search || filters.grade_level || filters.payment_cluster || filters.district;
+    filters.search || filters.grade_level || filters.payment_cluster || filters.province_city;
 
   const clearFilters = () => {
     setFilters(INITIAL_FILTERS);
@@ -148,7 +159,7 @@ export default function StudentsPage() {
             {data ? `${data.total} students total` : "Manage student enrollments and information"}
           </p>
         </div>
-        <Button 
+        <Button
           className="bg-amber-500 hover:bg-amber-600 text-white"
           onClick={() => setShowAddModal(true)}
         >
@@ -201,14 +212,17 @@ export default function StudentsPage() {
             ))}
           </select>
 
-          {/* District search */}
-          <input
-            type="text"
-            placeholder="District..."
-            value={filters.district}
-            onChange={(e) => handleFilterChange("district", e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white w-32"
-          />
+          {/* Province/City filter */}
+          <select
+            value={filters.province_city}
+            onChange={(e) => handleFilterChange("province_city", e.target.value)}
+            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white text-slate-700"
+          >
+            <option value="">All Provinces</option>
+            {VIETNAM_PROVINCES.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
 
           {/* Clear */}
           {hasActiveFilters && (
@@ -238,9 +252,9 @@ export default function StudentsPage() {
                 Cluster: {filters.payment_cluster.replace(/_/g, " ")}
               </span>
             )}
-            {filters.district && (
+            {filters.province_city && (
               <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                District: {filters.district}
+                Province: {filters.province_city}
               </span>
             )}
           </div>
@@ -269,86 +283,97 @@ export default function StudentsPage() {
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Grade Level</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Grade</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Parent Contact</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Location</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment Cluster</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {students.map((student, index) => (
-                  <tr
-                    key={student.id}
-                    className="hover:bg-slate-50 transition-colors animate-fade-in cursor-pointer"
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    {/* Student Info */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                          {student.full_name.charAt(0).toUpperCase()}
+                {students.map((student, index) => {
+                  const address = formatAddress(student);
+                  return (
+                    <tr
+                      key={student.id}
+                      className="hover:bg-slate-50 transition-colors animate-fade-in cursor-pointer"
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      {/* Student */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
+                            {student.full_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-900">{student.full_name}</p>
+                            <p className="text-xs text-slate-500">
+                              Enrolled:{" "}
+                              {new Date(student.enrollment_date).toLocaleDateString("en-US", {
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-slate-900">{student.full_name}</p>
-                          <p className="text-xs text-slate-500">
-                            Enrolled:{" "}
-                            {new Date(student.enrollment_date).toLocaleDateString("en-US", {
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </p>
+                      </td>
+
+                      {/* Grade */}
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 text-xs font-mono bg-blue-50 text-blue-700 rounded-full">
+                          {formatGradeLevel(student.grade_level)}
+                        </span>
+                      </td>
+
+                      {/* Parent Contact */}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 text-sm text-slate-700">
+                            <Users className="h-3 w-3" />
+                            <span className="font-medium">{student.parent_name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <Phone className="h-3 w-3" />
+                            <span className="font-mono">{student.parent_phone}</span>
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Grade Level */}
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 text-xs font-mono bg-blue-50 text-blue-700 rounded-full">
-                        {formatGradeLevel(student.grade_level)}
-                      </span>
-                    </td>
-
-                    {/* Parent Contact */}
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 text-sm text-slate-700">
-                          <Users className="h-3 w-3" />
-                          <span className="font-medium">{student.parent_name}</span>
+                      {/* Location */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-start gap-2 text-sm text-slate-600">
+                          <MapPin className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                          {address ? (
+                            <div>
+                              {student.ward && (
+                                <p className="font-medium">{student.ward}</p>
+                              )}
+                              {student.province_city && (
+                                <p className="text-xs text-slate-500">{student.province_city}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic text-xs">No address</span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                          <Phone className="h-3 w-3" />
-                          <span className="font-mono">{student.parent_phone}</span>
-                        </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Location */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <MapPin className="h-3 w-3" />
-                        <div>
-                          <p className="font-medium">{student.district || "Unknown District"}</p>
-                          <p className="text-xs text-slate-500">{student.city}</p>
-                        </div>
-                      </div>
-                    </td>
+                      {/* Payment */}
+                      <td className="px-6 py-4">
+                        <Badge variant={getPaymentClusterColor(student.payment_cluster)}>
+                          {student.payment_cluster.replace(/_/g, " ").toUpperCase()}
+                        </Badge>
+                      </td>
 
-                    {/* Payment Cluster */}
-                    <td className="px-6 py-4">
-                      <Badge variant={getPaymentClusterColor(student.payment_cluster)}>
-                        {student.payment_cluster.replace(/_/g, " ").toUpperCase()}
-                      </Badge>
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-6 py-4">
-                      <Badge variant={student.is_active ? "success" : "outline"}>
-                        {student.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Status */}
+                      <td className="px-6 py-4">
+                        <Badge variant={student.is_active ? "success" : "outline"}>
+                          {student.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -388,12 +413,11 @@ export default function StudentsPage() {
         )}
       </Card>
 
-      <AddStudentModal       
-      isOpen={showAddModal}
-      onClose={() => setShowAddModal(false)}
-      onSuccess={fetchStudents}
-    />
-
+      <AddStudentModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={fetchStudents}
+      />
     </div>
   );
 }

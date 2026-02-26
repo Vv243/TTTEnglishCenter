@@ -27,6 +27,7 @@ export type GradeLevel =
   | "high_10"
   | "high_11"
   | "high_12";
+    "adult";
 
 export type PaymentCluster =
   | "new_student"
@@ -45,9 +46,9 @@ export interface Student {
   parent_email: string | null;
   parent_zalo_id: string | null;
   parent_whatsapp: string | null;
-  address: string | null;
-  district: string | null;
-  city: string;
+  street_address: string | null;
+  ward: string | null;
+  province_city: string | null;
   english_level: string | null;
   target_exam: string | null;
   notes: string | null;

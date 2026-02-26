@@ -18,7 +18,7 @@ async def get_students(
     grade_level: Optional[str] = Query(None, description="Filter by grade level"),
     payment_cluster: Optional[str] = Query(None, description="Filter by payment cluster"),
     target_exam: Optional[str] = Query(None, description="Filter by target exam"),
-    district: Optional[str] = Query(None, description="Filter by district"),
+    province_city: Optional[str] = Query(None, description="Filter by province/city"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -41,8 +41,8 @@ async def get_students(
         query = query.where(StudentModel.payment_cluster == payment_cluster)
     if target_exam:
         query = query.where(StudentModel.target_exam == target_exam)
-    if district:
-        query = query.where(StudentModel.district.ilike(f"%{district}%"))
+    if province_city:
+        query = query.where(StudentModel.province_city.ilike(f"%{province_city}%"))
     
     # Get total count
     count_query = select(func.count()).select_from(query.subquery())

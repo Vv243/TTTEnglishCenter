@@ -28,10 +28,10 @@ class Student(Base, TimestampMixin):
     secondary_contact_name = Column(String(100))
     secondary_contact_phone = Column(String(20))
     
-    # Address
-    address = Column(String, nullable=False)
-    district = Column(String(100))
-    city = Column(String(100), nullable=False, default='Ho Chi Minh City')
+    # Address (Vietnam 2-tier system post-July 2025)
+    street_address = Column(String)
+    ward = Column(String(100))
+    province_city = Column(String(100), default='TP. Hồ Chí Minh')
     
     # Academic Info
     english_level = Column(String(20))

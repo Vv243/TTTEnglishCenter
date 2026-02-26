@@ -22,10 +22,10 @@ class StudentBase(BaseModel):
     secondary_contact_name: Optional[str] = Field(None, max_length=100)
     secondary_contact_phone: Optional[str] = Field(None, max_length=20)
     
-    # Address
-    address: str
-    district: Optional[str] = Field(None, max_length=100)
-    city: str = Field(default='Ho Chi Minh City', max_length=100)
+    # Address (Vietnam 2-tier system post-July 2025)
+    street_address: Optional[str] = None
+    ward: Optional[str] = Field(None, max_length=100)
+    province_city: Optional[str] = Field(default='TP. Hồ Chí Minh', max_length=100)
     
     # Academic info
     english_level: Optional[str] = Field(None, pattern='^(beginner|elementary|pre_intermediate|intermediate|upper_intermediate|advanced)$')
@@ -56,9 +56,9 @@ class StudentUpdate(BaseModel):
     parent_phone: Optional[str] = None
     parent_email: Optional[EmailStr] = None
     parent_zalo: Optional[str] = None
-    address: Optional[str] = None
-    district: Optional[str] = None
-    city: Optional[str] = None
+    street_address: Optional[str] = None
+    ward: Optional[str] = None
+    province_city: Optional[str] = None
     english_level: Optional[str] = None
     target_exam: Optional[str] = None
     current_school_name: Optional[str] = None
