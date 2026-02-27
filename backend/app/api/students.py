@@ -118,7 +118,11 @@ async def create_student(
         print(f"ℹ️ Parent phone {student_data.parent_phone} already has {len(existing_siblings)} student(s)")
     
     # Create student
-    student = StudentModel(**student_data.model_dump())
+    from datetime import date
+    student_dict = student_data.model_dump()
+    if not student_dict.get('enrollment_date'):
+        student_dict['enrollment_date'] = date.today()
+    student = StudentModel(**student_dict)
     
     db.add(student)
     await db.commit()
