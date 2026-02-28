@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from app.api import api_router
 from app.database import engine
 from app.api.ml import router as ml_router
-
+from app.models import payment_history
 load_dotenv()
 
 # Lifespan events (startup/shutdown)

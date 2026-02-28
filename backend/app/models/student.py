@@ -54,6 +54,7 @@ class Student(Base, TimestampMixin):
     
     # Relationships
     enrollments = relationship("Enrollment", back_populates="student")
+    payment_history = relationship("PaymentHistory", back_populates="student")
     
     def __repr__(self):
         return f"<Student(id={self.id}, name={self.full_name}, grade={self.grade_level})>"
