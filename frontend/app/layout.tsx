@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Space_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { Header } from "@/components/layout/Header";
 
 const ibmPlexSans = IBM_Plex_Sans({
   weight: ["400", "500", "600", "700"],
@@ -29,20 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${ibmPlexSans.variable} ${spaceMono.variable}`}>
       <body className="font-sans antialiased">
-        <div className="flex h-screen overflow-hidden bg-slate-50">
-          {/* Sidebar */}
-          <Sidebar />
-
-          {/* Main Content */}
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <Header />
-            <main className="flex-1 overflow-y-auto">
-              <div className="p-8">
-                {children}
-              </div>
-            </main>
-          </div>
-        </div>
+        {children}
       </body>
     </html>
   );

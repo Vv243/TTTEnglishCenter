@@ -5,7 +5,7 @@
 **Live Frontend:** http://localhost:3000  
 **Live API:** http://localhost:8000/docs  
 **Database:** PostgreSQL on port 5433  
-**Status:** 🟢 Day 7 In Progress - Address System Upgraded (65%)
+**Status:** 🟢 Day 8 Complete (80%)
 
 ---
 
@@ -24,14 +24,27 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 ### Feature 1: ML-Powered Attendance Prediction ✅ LIVE
 - **Random Forest Regressor:** Predicts attendance using payment cluster, grade level, discount, score
 - **At-Risk Detection:** Flags students predicted below 70% attendance
-- **21 enrollments analyzed**, 5 at-risk identified, confidence: high
+- **31 enrollments analyzed**, at-risk students identified, confidence: high
 
-### Feature 2: Payment Forecasting (Day 7)
-- **Facebook Prophet:** 90-day revenue forecasting
-- **Target:** 87%+ forecast accuracy
+### Feature 2: Payment Intelligence ✅ LIVE
+- **Hybrid Forecasting:** Rule-based core × Facebook Prophet trend multiplier
+- **90-day revenue forecast** with confidence bands (±15%)
+- **Per-student risk scoring** blending payment cluster probability with actual history
+- **Endpoints:** `/ml/payment-forecast`, `/ml/payment-risk`
 
-### Feature 3: Smart Scheduling (Days 8-9)
-- **CSP Solver:** Optimal makeup class scheduling
+### Feature 3: JWT Authentication ✅ LIVE
+- **Role-based access control:** Admin and Teacher roles
+- **bcrypt password hashing** with secure JWT token generation (8hr expiry)
+- **Next.js middleware** protecting all routes, redirecting to `/login`
+- **Route groups:** `(main)/` isolates sidebar/header from login page
+- **Default accounts:** admin/admin123, teacher accounts for all 3 teachers
+
+### Feature 4: CSP Smart Scheduling ✅ LIVE
+- **Backtracking CSP solver** with DAG conflict detection
+- **Duration-aware slots** per class level (60–120 min)
+- **Teacher conflict prevention** across 6 concurrent classes
+- **6/6 classes scheduled, 0 conflicts** across 3 teachers
+- **Endpoint:** `POST /ml/schedule`
 
 ---
 
@@ -39,11 +52,12 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 14, TypeScript, TailwindCSS, shadcn/ui |
+| Frontend | Next.js 14, TypeScript, TailwindCSS, shadcn/ui, Recharts |
 | Backend | FastAPI (Python, async) |
 | Database | PostgreSQL 16 (Docker, port 5433) |
 | ORM | SQLAlchemy 2.0 (async + asyncpg) |
 | ML | scikit-learn, Prophet, pandas, numpy |
+| Auth | python-jose (JWT), passlib + bcrypt, js-cookie |
 | Infrastructure | Docker Compose |
 
 ---
@@ -55,9 +69,40 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 | 1-3 | Backend foundation, all APIs | ✅ Done |
 | 4-5 | Frontend, search/filters, integration | ✅ Done |
 | 6 | ML attendance prediction | ✅ Done |
-| 7 | Address system upgrade + Payment forecasting | 🔄 In Progress |
-| 8-9 | CSP scheduling + edit/delete + mobile polish | 📅 Upcoming |
+| 7 | Address system upgrade + Payment forecasting | ✅ Done |
+| 8 | JWT authentication + CSP scheduling | ✅ Done |
+| 9 | Edit/Delete forms + mobile polish | 📅 Upcoming |
 | 10 | Deployment (Vercel + Railway + Neon) | 📅 Upcoming |
+
+---
+
+## 🌐 Pages
+
+| Page | Route | Status |
+|------|-------|--------|
+| Login | `/login` | ✅ Working (JWT, role-based) |
+| Dashboard | `/` | ✅ Working |
+| Teachers | `/teachers` | ✅ Working (search + role filter) |
+| Students | `/students` | ✅ Working (search + grade/cluster/province filters) |
+| Classes | `/classes` | ✅ Working (card grid) |
+| Enrollments | `/enrollments` | ✅ Working (attendance + trends) |
+| ML Insights | `/ml` | ✅ Working (Random Forest + CSP scheduler) |
+| Payments | `/payments` | ✅ Working (forecast chart + risk table) |
+
+---
+
+## 🔐 Authentication
+
+Default accounts seeded at setup:
+
+| Username | Password | Role |
+|----------|----------|------|
+| admin | admin123 | Admin |
+| co_lan | teacher123 | Teacher |
+| co_mai | teacher123 | Teacher |
+| thay_duc | teacher123 | Teacher |
+
+JWT tokens expire after 8 hours. All write endpoints (POST/PATCH/DELETE) require a valid Bearer token.
 
 ---
 
@@ -69,12 +114,7 @@ As of July 1, 2025, Vietnam moved from a 3-tier to a 2-tier administrative syste
 - **New:** Province → Ward (Phường/Xã) — district level eliminated
 - **Provinces:** Reduced from 63 to 34
 
-Key changes for this app:
-- An Giang merged with Kiên Giang (includes Châu Đốc and Phú Quốc)
-- HCM City absorbed Bình Dương and Bà Rịa–Vũng Tàu
-- "Quận 1" etc. are now colloquial — official addresses use ward names
-
-EduCore address fields (all optional, free text except province dropdown):
+EduCore address fields (all optional):
 
 | Field | Example |
 |-------|---------|
@@ -84,8 +124,38 @@ EduCore address fields (all optional, free text except province dropdown):
 
 ---
 
-## 🚀 Quick Start (Windows PowerShell)
+## 🗄️ Database
 
+**Data:** 3 teachers, 21 students, 6 classes, 31 enrollments, 126 payment history records, 4 users
+
+**Tables:**
+- `teachers`, `students`, `classes`, `enrollments` — core data
+- `payment_history` — 6 months of payment records (Jul–Dec 2025)
+- `users` — admin/teacher accounts with bcrypt hashed passwords
+
+**Rules:**
+- UUID primary keys — never auto-increment
+- Soft deletes — `is_active = false`, never hard delete
+- Port 5433 — never change to 5432
+
+---
+
+## 🤖 ML & Auth Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/auth/login` | POST | Login, returns JWT token |
+| `/auth/register` | POST | Register user (admin only) |
+| `/auth/me` | GET | Get current user info |
+| `/ml/predict-attendance/{id}` | GET | Predict attendance for one enrollment |
+| `/ml/attendance-summary` | GET | Predict attendance for all active enrollments |
+| `/ml/payment-forecast` | GET | 90-day revenue forecast |
+| `/ml/payment-risk` | GET | Per-student payment risk ranking |
+| `/ml/schedule` | POST | Generate conflict-free timetable via CSP |
+
+---
+
+## 🚀 Quick Start (Windows PowerShell)
 ```powershell
 # 1. Start Docker services
 docker-compose up -d
@@ -100,6 +170,8 @@ cd frontend
 npm run dev
 ```
 
+Navigate to http://localhost:3000 — you'll be redirected to `/login`. Use `admin` / `admin123`.
+
 | Service | URL |
 |---------|-----|
 | Frontend | http://localhost:3000 |
@@ -108,31 +180,17 @@ npm run dev
 
 ---
 
-## 🗄️ Database
-
-**Data:** 3 teachers, 20 students, 6 classes, 31 enrollments
-
-**Key constraints:**
-- `check_reasonable_age`: DOB must be 5-80 years ago (supports adult learners)
-- `students_grade_level_check`: primary_1-5, secondary_6-9, high_10-12, **adult**
-- `classes_level_check`: primary_1-5, secondary_6-9, high_10-12, starters, movers, flyers, ket, pet, fce, ielts, toefl, sat, general_english
-
-**Rules:**
-- UUID primary keys — never auto-increment
-- Soft deletes — `is_active = false`, never hard delete
-- Port 5433 — never change to 5432
-
----
-
 ## 🐛 Known Issues & Fixes
 
 | Issue | Fix |
 |-------|-----|
-| Classes API 500 | Invalid level value — check constraint above |
-| Students page empty | Trailing slashes on API calls + remap `d.students` |
-| Port 5432 conflict | Intentionally uses 5433 — do not change |
-| Student create 500 | Check age constraint (5-80) and grade_level includes adult |
+| passlib + modern bcrypt conflict | `pip install bcrypt==4.0.1` |
+| PowerShell $ interpolation corrupts hashes | Write SQL via Python script file, not here-string |
+| Hydration error in Header | Read cookie in useEffect, not during render |
+| Login page shows sidebar | Use (main) route group + bare root layout.tsx |
+| Classes API 500 | Invalid level value — check constraint |
 | Province filter ignored | Backend param is `province_city` not `district` |
+| discount_percent missing | Column is on enrollments, not students table |
 
 ---
 
@@ -143,4 +201,4 @@ Building for family's tutoring center in Sài Gòn.
 Mom teaches in Sài Gòn · Aunts from Châu Đốc, An Giang.
 
 **Built with ❤️ for Vietnamese English teachers**  
-*Last Updated: February 27, 2026 — Day 7 In Progress (65%)*
+*Last Updated: March 4, 2026 — Day 8 Complete (80%)*

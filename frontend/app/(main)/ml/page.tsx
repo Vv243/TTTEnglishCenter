@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import api from "@/lib/api";
-import { AlertTriangle, Brain, TrendingUp, Users, CheckCircle } from "lucide-react";
+import api, { mlAPI } from "@/lib/api";
+import { AlertTriangle, Brain, TrendingUp, Users, CheckCircle, Calendar } from "lucide-react";
 
 interface Prediction {
   enrollment_id: string;
@@ -24,6 +24,24 @@ interface SummaryData {
   at_risk_students: Prediction[];
 }
 
+interface ScheduleItem {
+  class_id: string;
+  class_name: string;
+  level: string;
+  teacher_name: string;
+  day: string;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  room_capacity: number;
+}
+
+interface ScheduleData {
+  schedule: ScheduleItem[];
+  conflicts: { class_id: string; class_name: string; reason: string }[];
+  stats: { total: number; scheduled: number; unscheduled: number; teachers_involved: number };
+}
+
 const CLUSTER_LABELS: Record<string, string> = {
   always_on_time: "Always On Time",
   new_student: "New Student",
@@ -38,6 +56,15 @@ const CLUSTER_COLORS: Record<string, string> = {
   needs_reminder: "bg-yellow-100 text-yellow-700",
   erratic: "bg-orange-100 text-orange-700",
   high_risk: "bg-red-100 text-red-700",
+};
+
+const DAY_COLORS: Record<string, string> = {
+  Monday: "bg-blue-50 text-blue-700",
+  Tuesday: "bg-purple-50 text-purple-700",
+  Wednesday: "bg-green-50 text-green-700",
+  Thursday: "bg-orange-50 text-orange-700",
+  Friday: "bg-pink-50 text-pink-700",
+  Saturday: "bg-amber-50 text-amber-700",
 };
 
 const getAttendanceColor = (rate: number) => {
@@ -56,9 +83,11 @@ export default function MLInsightsPage() {
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "at-risk">("at-risk");
+  const [schedule, setSchedule] = useState<ScheduleData | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchData = async () => {
       try {
         const res = await api.get("/ml/attendance-summary/");
         setData(res.data);
@@ -68,8 +97,20 @@ export default function MLInsightsPage() {
         setLoading(false);
       }
     };
-    fetch();
+    fetchData();
   }, []);
+
+  const generateSchedule = async () => {
+    setScheduleLoading(true);
+    try {
+      const data = await mlAPI.getSchedule();
+      setSchedule(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -115,7 +156,6 @@ export default function MLInsightsPage() {
             </div>
           </div>
         </Card>
-
         <Card className="p-5 border-red-200 bg-red-50">
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-8 w-8 text-red-500" />
@@ -125,7 +165,6 @@ export default function MLInsightsPage() {
             </div>
           </div>
         </Card>
-
         <Card className="p-5 border-green-200 bg-green-50">
           <div className="flex items-center gap-3">
             <CheckCircle className="h-8 w-8 text-green-500" />
@@ -135,7 +174,6 @@ export default function MLInsightsPage() {
             </div>
           </div>
         </Card>
-
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <TrendingUp className="h-8 w-8 text-amber-500" />
@@ -149,9 +187,7 @@ export default function MLInsightsPage() {
 
       {/* Risk Distribution Bar */}
       <Card className="p-5">
-        <h2 className="text-sm font-semibold text-slate-600 mb-3 uppercase tracking-wider">
-          Risk Distribution
-        </h2>
+        <h2 className="text-sm font-semibold text-slate-600 mb-3 uppercase tracking-wider">Risk Distribution</h2>
         <div className="flex h-6 rounded-full overflow-hidden gap-0.5">
           <div
             className="bg-red-500 flex items-center justify-center text-white text-xs font-bold transition-all"
@@ -174,14 +210,11 @@ export default function MLInsightsPage() {
 
       {/* Predictions Table */}
       <Card className="overflow-hidden">
-        {/* Tabs */}
         <div className="flex border-b border-slate-200">
           <button
             onClick={() => setActiveTab("at-risk")}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === "at-risk"
-                ? "text-red-600 border-b-2 border-red-500 bg-red-50"
-                : "text-slate-500 hover:text-slate-700"
+              activeTab === "at-risk" ? "text-red-600 border-b-2 border-red-500 bg-red-50" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             ⚠️ At-Risk ({data.at_risk_count})
@@ -189,30 +222,24 @@ export default function MLInsightsPage() {
           <button
             onClick={() => setActiveTab("all")}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === "all"
-                ? "text-amber-600 border-b-2 border-amber-500"
-                : "text-slate-500 hover:text-slate-700"
+              activeTab === "all" ? "text-amber-600 border-b-2 border-amber-500" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             All Predictions ({data.total_enrollments})
           </button>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment Cluster</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Current</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Predicted</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Risk</th>
+                {["Student", "Payment Cluster", "Current", "Predicted", "Risk"].map(h => (
+                  <th key={h} className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {displayed.map((p, i) => (
-                <tr key={p.enrollment_id} className="hover:bg-slate-50 transition-colors"
-                  style={{ animationDelay: `${i * 30}ms` }}>
+                <tr key={p.enrollment_id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className={`h-9 w-9 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 ${p.risk_flag ? "bg-red-500" : "bg-green-500"}`}>
@@ -229,12 +256,9 @@ export default function MLInsightsPage() {
                   <td className="px-6 py-4">
                     {p.current_attendance !== null ? (
                       <div className="flex items-center gap-2">
-                        <span className={`font-mono font-bold ${getAttendanceTextColor(p.current_attendance)}`}>
-                          {p.current_attendance}%
-                        </span>
+                        <span className={`font-mono font-bold ${getAttendanceTextColor(p.current_attendance)}`}>{p.current_attendance}%</span>
                         <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${getAttendanceColor(p.current_attendance)}`}
-                            style={{ width: `${p.current_attendance}%` }} />
+                          <div className={`h-full rounded-full ${getAttendanceColor(p.current_attendance)}`} style={{ width: `${p.current_attendance}%` }} />
                         </div>
                       </div>
                     ) : (
@@ -243,24 +267,17 @@ export default function MLInsightsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className={`font-mono font-bold ${getAttendanceTextColor(p.predicted_attendance)}`}>
-                        {p.predicted_attendance}%
-                      </span>
+                      <span className={`font-mono font-bold ${getAttendanceTextColor(p.predicted_attendance)}`}>{p.predicted_attendance}%</span>
                       <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${getAttendanceColor(p.predicted_attendance)}`}
-                          style={{ width: `${p.predicted_attendance}%` }} />
+                        <div className={`h-full rounded-full ${getAttendanceColor(p.predicted_attendance)}`} style={{ width: `${p.predicted_attendance}%` }} />
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     {p.risk_flag ? (
-                      <span className="flex items-center gap-1 text-red-600 text-sm font-medium">
-                        <AlertTriangle className="h-3 w-3" /> At Risk
-                      </span>
+                      <span className="flex items-center gap-1 text-red-600 text-sm font-medium"><AlertTriangle className="h-3 w-3" /> At Risk</span>
                     ) : (
-                      <span className="flex items-center gap-1 text-green-600 text-sm font-medium">
-                        <CheckCircle className="h-3 w-3" /> On Track
-                      </span>
+                      <span className="flex items-center gap-1 text-green-600 text-sm font-medium"><CheckCircle className="h-3 w-3" /> On Track</span>
                     )}
                   </td>
                 </tr>
@@ -269,6 +286,98 @@ export default function MLInsightsPage() {
           </table>
         </div>
       </Card>
+
+      {/* ── CSP Schedule Generator ── */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Calendar className="h-6 w-6 text-amber-500" />
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Smart Schedule Generator</h2>
+              <p className="text-sm text-slate-500">CSP solver with backtracking + DAG conflict detection</p>
+            </div>
+          </div>
+          <button
+            onClick={generateSchedule}
+            disabled={scheduleLoading}
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-300 disabled:cursor-not-allowed text-slate-900 font-semibold rounded-lg transition-colors text-sm"
+          >
+            {scheduleLoading ? "⏳ Generating..." : "⚡ Generate Schedule"}
+          </button>
+        </div>
+
+        {!schedule && !scheduleLoading && (
+          <Card className="p-8 text-center border-dashed">
+            <Calendar className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">Click Generate Schedule to run the CSP solver across all active classes</p>
+          </Card>
+        )}
+
+        {schedule && (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-4 gap-4 mb-4">
+              {[
+                { label: "Total Classes", value: schedule.stats.total },
+                { label: "Scheduled", value: schedule.stats.scheduled, color: "text-green-600" },
+                { label: "Conflicts", value: schedule.stats.unscheduled, color: "text-red-500" },
+                { label: "Teachers", value: schedule.stats.teachers_involved },
+              ].map(stat => (
+                <Card key={stat.label} className="p-4">
+                  <p className="text-xs text-slate-500 mb-1">{stat.label}</p>
+                  <p className={`text-2xl font-bold ${stat.color ?? "text-slate-900"}`}>{stat.value}</p>
+                </Card>
+              ))}
+            </div>
+
+            {/* Timetable */}
+            <Card className="overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-semibold text-slate-900">Generated Timetable</h3>
+                <span className="text-xs text-slate-400">{schedule.stats.scheduled} classes · no teacher conflicts</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      {["Day", "Time", "Class", "Level", "Teacher", "Duration", "Capacity"].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {schedule.schedule.map((item) => (
+                      <tr key={item.class_id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${DAY_COLORS[item.day] ?? "bg-slate-100 text-slate-600"}`}>
+                            {item.day}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{item.start_time} – {item.end_time}</td>
+                        <td className="px-4 py-3 font-medium text-slate-900">{item.class_name}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-600 text-xs">{item.level}</span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{item.teacher_name}</td>
+                        <td className="px-4 py-3 text-slate-500">{item.duration_minutes}m</td>
+                        <td className="px-4 py-3 text-slate-500">{item.room_capacity}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {schedule.conflicts.length > 0 && (
+                <div className="px-6 py-4 border-t border-red-100 bg-red-50">
+                  <p className="text-sm font-medium text-red-700 mb-2">⚠️ Could not schedule {schedule.conflicts.length} class(es):</p>
+                  {schedule.conflicts.map(c => (
+                    <p key={c.class_id} className="text-xs text-red-600">{c.class_name} — {c.reason}</p>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </>
+        )}
+      </div>
     </div>
   );
 }

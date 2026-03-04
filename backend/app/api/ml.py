@@ -6,12 +6,18 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from datetime import date, timedelta
 import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 from app.database import get_db
 from app.models.enrollment import Enrollment
 from app.models.student import Student
 from app.models.payment_history import PaymentHistory
+
+from itertools import product
+from collections import defaultdict
+from app.models.class_model import Class as ClassModel
+import uuid as uuid_lib
 
 router = APIRouter(prefix="/ml", tags=["ML Predictions"])
 
@@ -30,30 +36,48 @@ CLUSTER_RISK = {
 # Payment collection probability by cluster (for hybrid forecast)
 CLUSTER_COLLECTION_RATE = {
     "always_on_time": 0.95,
-    "new_student":    0.80,
+    "new_student": 0.80,
     "needs_reminder": 0.75,
-    "erratic":        0.55,
-    "high_risk":      0.30,
+    "erratic": 0.55,
+    "high_risk": 0.30,
 }
 
 GRADE_ORDER = {
-    "primary_1": 1, "primary_2": 2, "primary_3": 3, "primary_4": 4, "primary_5": 5,
-    "secondary_6": 6, "secondary_7": 7, "secondary_8": 8, "secondary_9": 9,
-    "high_10": 10, "high_11": 11, "high_12": 12, "adult": 13,
+    "primary_1": 1,
+    "primary_2": 2,
+    "primary_3": 3,
+    "primary_4": 4,
+    "primary_5": 5,
+    "secondary_6": 6,
+    "secondary_7": 7,
+    "secondary_8": 8,
+    "secondary_9": 9,
+    "high_10": 10,
+    "high_11": 11,
+    "high_12": 12,
+    "adult": 13,
 }
 
 GRADE_TUITION = {
-    "primary_1": 800000, "primary_2": 800000, "primary_3": 800000,
-    "primary_4": 800000, "primary_5": 800000,
-    "secondary_6": 1000000, "secondary_7": 1000000,
-    "secondary_8": 1000000, "secondary_9": 1000000,
-    "high_10": 1200000, "high_11": 1200000, "high_12": 1200000,
+    "primary_1": 800000,
+    "primary_2": 800000,
+    "primary_3": 800000,
+    "primary_4": 800000,
+    "primary_5": 800000,
+    "secondary_6": 1000000,
+    "secondary_7": 1000000,
+    "secondary_8": 1000000,
+    "secondary_9": 1000000,
+    "high_10": 1200000,
+    "high_11": 1200000,
+    "high_12": 1200000,
     "adult": 1500000,
 }
 
 # ============================================================
 # ATTENDANCE PREDICTION (Day 6 — unchanged)
 # ============================================================
+
 
 async def get_training_data(db: AsyncSession):
     result = await db.execute(
@@ -66,13 +90,17 @@ async def get_training_data(db: AsyncSession):
 
     records = []
     for enrollment, student in rows:
-        records.append({
-            "attendance_rate": float(enrollment.attendance_rate),
-            "cluster_risk": CLUSTER_RISK.get(student.payment_cluster, 2),
-            "grade_numeric": GRADE_ORDER.get(student.grade_level, 6),
-            "discount_percent": float(enrollment.discount_percent or 0),
-            "average_score": float(enrollment.average_score) if enrollment.average_score else 7.0,
-        })
+        records.append(
+            {
+                "attendance_rate": float(enrollment.attendance_rate),
+                "cluster_risk": CLUSTER_RISK.get(student.payment_cluster, 2),
+                "grade_numeric": GRADE_ORDER.get(student.grade_level, 6),
+                "discount_percent": float(enrollment.discount_percent or 0),
+                "average_score": (
+                    float(enrollment.average_score) if enrollment.average_score else 7.0
+                ),
+            }
+        )
 
     return pd.DataFrame(records)
 
@@ -103,24 +131,37 @@ async def predict_attendance(enrollment_id: str, db: AsyncSession = Depends(get_
         return {"error": "Insufficient training data", "min_required": 5}
 
     model = train_model(df)
-    features = pd.DataFrame([{
-        "cluster_risk": CLUSTER_RISK.get(student.payment_cluster, 2),
-        "grade_numeric": GRADE_ORDER.get(student.grade_level, 6),
-        "discount_percent": float(enrollment.discount_percent or 0),
-        "average_score": float(enrollment.average_score) if enrollment.average_score else 7.0,
-    }])
+    features = pd.DataFrame(
+        [
+            {
+                "cluster_risk": CLUSTER_RISK.get(student.payment_cluster, 2),
+                "grade_numeric": GRADE_ORDER.get(student.grade_level, 6),
+                "discount_percent": float(enrollment.discount_percent or 0),
+                "average_score": (
+                    float(enrollment.average_score) if enrollment.average_score else 7.0
+                ),
+            }
+        ]
+    )
 
     predicted = float(model.predict(features)[0])
     predicted = max(0, min(100, predicted))
 
-    feature_names = ["cluster_risk", "grade_numeric", "discount_percent", "average_score"]
+    feature_names = [
+        "cluster_risk",
+        "grade_numeric",
+        "discount_percent",
+        "average_score",
+    ]
     importance = dict(zip(feature_names, model.feature_importances_.tolist()))
 
     return {
         "enrollment_id": enrollment_id,
         "student_name": student.full_name,
         "payment_cluster": student.payment_cluster,
-        "current_attendance": float(enrollment.attendance_rate) if enrollment.attendance_rate else None,
+        "current_attendance": (
+            float(enrollment.attendance_rate) if enrollment.attendance_rate else None
+        ),
         "predicted_attendance": round(predicted, 1),
         "confidence": "high" if len(df) >= 20 else "medium" if len(df) >= 10 else "low",
         "training_samples": len(df),
@@ -145,24 +186,38 @@ async def attendance_summary(db: AsyncSession = Depends(get_db)):
     predictions = []
 
     for enrollment, student in all_enrollments:
-        features = pd.DataFrame([{
-            "cluster_risk": CLUSTER_RISK.get(student.payment_cluster, 2),
-            "grade_numeric": GRADE_ORDER.get(student.grade_level, 6),
-            "discount_percent": float(enrollment.discount_percent or 0),
-            "average_score": float(enrollment.average_score) if enrollment.average_score else 7.0,
-        }])
+        features = pd.DataFrame(
+            [
+                {
+                    "cluster_risk": CLUSTER_RISK.get(student.payment_cluster, 2),
+                    "grade_numeric": GRADE_ORDER.get(student.grade_level, 6),
+                    "discount_percent": float(enrollment.discount_percent or 0),
+                    "average_score": (
+                        float(enrollment.average_score)
+                        if enrollment.average_score
+                        else 7.0
+                    ),
+                }
+            ]
+        )
 
         predicted = float(model.predict(features)[0])
         predicted = max(0, min(100, predicted))
 
-        predictions.append({
-            "enrollment_id": str(enrollment.id),
-            "student_name": student.full_name,
-            "payment_cluster": student.payment_cluster,
-            "current_attendance": float(enrollment.attendance_rate) if enrollment.attendance_rate else None,
-            "predicted_attendance": round(predicted, 1),
-            "risk_flag": predicted < 70,
-        })
+        predictions.append(
+            {
+                "enrollment_id": str(enrollment.id),
+                "student_name": student.full_name,
+                "payment_cluster": student.payment_cluster,
+                "current_attendance": (
+                    float(enrollment.attendance_rate)
+                    if enrollment.attendance_rate
+                    else None
+                ),
+                "predicted_attendance": round(predicted, 1),
+                "risk_flag": predicted < 70,
+            }
+        )
 
     predictions.sort(key=lambda x: x["predicted_attendance"])
     at_risk = [p for p in predictions if p["risk_flag"]]
@@ -182,16 +237,19 @@ async def attendance_summary(db: AsyncSession = Depends(get_db)):
 # Hybrid approach: rule-based core + Prophet trend adjustment
 # ============================================================
 
+
 def _get_monthly_actuals(payment_rows: list) -> pd.DataFrame:
     """Aggregate payment_history rows into monthly revenue totals."""
     records = []
     for ph, student in payment_rows:
         # Only count actually collected payments (paid or late — money came in)
         if ph.status in ("paid", "late") and ph.paid_date:
-            records.append({
-                "ds": pd.Timestamp(ph.paid_date).to_period("M").to_timestamp(),
-                "amount": float(ph.amount),
-            })
+            records.append(
+                {
+                    "ds": pd.Timestamp(ph.paid_date).to_period("M").to_timestamp(),
+                    "amount": float(ph.amount),
+                }
+            )
 
     if not records:
         return pd.DataFrame(columns=["ds", "y"])
@@ -224,13 +282,13 @@ def _prophet_trend_multiplier(monthly_df: pd.DataFrame, periods: int = 3) -> flo
         m.fit(monthly_df)
 
         last_date = monthly_df["ds"].max()
-        future_dates = pd.DataFrame({
-            "ds": [last_date + pd.DateOffset(months=i) for i in range(1, periods + 1)]
-        })
+        future_dates = pd.DataFrame(
+            {"ds": [last_date + pd.DateOffset(months=i) for i in range(1, periods + 1)]}
+        )
         forecast = m.predict(future_dates)
 
         avg_historical = monthly_df["y"].mean()
-        avg_forecast   = forecast["yhat"].mean()
+        avg_forecast = forecast["yhat"].mean()
 
         if avg_historical <= 0:
             return 1.0
@@ -264,16 +322,14 @@ async def payment_forecast(db: AsyncSession = Depends(get_db)):
     monthly_actuals = _get_monthly_actuals(payment_rows)
 
     # --- 2. Fetch active students for rule-based forecast ---
-    students_result = await db.execute(
-        select(Student).where(Student.is_active == True)
-    )
+    students_result = await db.execute(select(Student).where(Student.is_active == True))
     active_students = students_result.scalars().all()
 
     # --- 3. Rule-based monthly expected revenue ---
     rule_based_monthly = 0.0
     for student in active_students:
-        tuition      = GRADE_TUITION.get(student.grade_level, 1000000)
-        collection   = CLUSTER_COLLECTION_RATE.get(student.payment_cluster, 0.75)
+        tuition = GRADE_TUITION.get(student.grade_level, 1000000)
+        collection = CLUSTER_COLLECTION_RATE.get(student.payment_cluster, 0.75)
         rule_based_monthly += tuition * collection
 
     # --- 4. Prophet trend multiplier ---
@@ -284,37 +340,45 @@ async def payment_forecast(db: AsyncSession = Depends(get_db)):
     forecast_months = []
     for i in range(1, 4):
         month_start = (today.replace(day=1) + timedelta(days=32 * i)).replace(day=1)
-        expected    = rule_based_monthly * trend_multiplier
-        lower       = expected * 0.85
-        upper       = expected * 1.15
+        expected = rule_based_monthly * trend_multiplier
+        lower = expected * 0.85
+        upper = expected * 1.15
 
-        forecast_months.append({
-            "month": month_start.strftime("%Y-%m"),
-            "month_label": month_start.strftime("%B %Y"),
-            "expected_revenue": round(expected),
-            "lower_bound":      round(lower),
-            "upper_bound":      round(upper),
-        })
+        forecast_months.append(
+            {
+                "month": month_start.strftime("%Y-%m"),
+                "month_label": month_start.strftime("%B %Y"),
+                "expected_revenue": round(expected),
+                "lower_bound": round(lower),
+                "upper_bound": round(upper),
+            }
+        )
 
     # --- 6. Format historical actuals for chart ---
     historical = []
     for _, row in monthly_actuals.iterrows():
-        historical.append({
-            "month":   row["ds"].strftime("%Y-%m"),
-            "month_label": row["ds"].strftime("%B %Y"),
-            "actual_revenue": round(row["y"]),
-        })
+        historical.append(
+            {
+                "month": row["ds"].strftime("%Y-%m"),
+                "month_label": row["ds"].strftime("%B %Y"),
+                "actual_revenue": round(row["y"]),
+            }
+        )
 
     # --- 7. Summary stats ---
     total_expected_90d = sum(m["expected_revenue"] for m in forecast_months)
-    avg_historical     = round(monthly_actuals["y"].mean()) if not monthly_actuals.empty else 0
+    avg_historical = (
+        round(monthly_actuals["y"].mean()) if not monthly_actuals.empty else 0
+    )
 
     return {
         "summary": {
-            "active_students":       len(active_students),
-            "rule_based_monthly":    round(rule_based_monthly),
-            "trend_multiplier":      round(trend_multiplier, 3),
-            "expected_next_month":   forecast_months[0]["expected_revenue"] if forecast_months else 0,
+            "active_students": len(active_students),
+            "rule_based_monthly": round(rule_based_monthly),
+            "trend_multiplier": round(trend_multiplier, 3),
+            "expected_next_month": (
+                forecast_months[0]["expected_revenue"] if forecast_months else 0
+            ),
             "total_expected_90_days": total_expected_90d,
             "avg_historical_monthly": avg_historical,
             "forecast_method": "Hybrid: Rule-based × Prophet trend",
@@ -332,9 +396,7 @@ async def payment_risk(db: AsyncSession = Depends(get_db)):
     """
 
     # Fetch all active students with their payment history
-    result = await db.execute(
-        select(Student).where(Student.is_active == True)
-    )
+    result = await db.execute(select(Student).where(Student.is_active == True))
     active_students = result.scalars().all()
 
     student_ids = [s.id for s in active_students]
@@ -351,35 +413,36 @@ async def payment_risk(db: AsyncSession = Depends(get_db)):
 
     # Group by student
     from collections import defaultdict
+
     payments_by_student = defaultdict(list)
     for ph in recent_payments:
         payments_by_student[ph.student_id].append(ph)
 
     risk_list = []
     for student in active_students:
-        cluster      = student.payment_cluster or "new_student"
-        base_rate    = CLUSTER_COLLECTION_RATE.get(cluster, 0.75)
-        tuition      = GRADE_TUITION.get(student.grade_level, 1000000)
-        history      = payments_by_student.get(student.id, [])
+        cluster = student.payment_cluster or "new_student"
+        base_rate = CLUSTER_COLLECTION_RATE.get(cluster, 0.75)
+        tuition = GRADE_TUITION.get(student.grade_level, 1000000)
+        history = payments_by_student.get(student.id, [])
 
         # Calculate actual recent miss rate from history
         if history:
             missed_count = sum(1 for p in history if p.status == "missed")
-            late_count   = sum(1 for p in history if p.status == "late")
-            total        = len(history)
-            miss_rate    = missed_count / total
-            late_rate    = late_count / total
+            late_count = sum(1 for p in history if p.status == "late")
+            total = len(history)
+            miss_rate = missed_count / total
+            late_rate = late_count / total
 
             # Blend cluster base rate with actual recent behavior
             actual_collection = 1 - miss_rate - (late_rate * 0.3)
-            collection_rate   = (base_rate * 0.4) + (actual_collection * 0.6)
+            collection_rate = (base_rate * 0.4) + (actual_collection * 0.6)
         else:
-            miss_rate       = 0
-            late_rate       = 0
+            miss_rate = 0
+            late_rate = 0
             collection_rate = base_rate
 
         collection_rate = max(0.0, min(1.0, collection_rate))
-        risk_score      = 1 - collection_rate  # higher = more at risk
+        risk_score = 1 - collection_rate  # higher = more at risk
 
         # Risk tier
         if risk_score >= 0.60:
@@ -401,43 +464,215 @@ async def payment_risk(db: AsyncSession = Depends(get_db)):
         else:
             reason = "On track"
 
-        risk_list.append({
-            "student_id":        str(student.id),
-            "student_name":      student.full_name,
-            "payment_cluster":   cluster,
-            "grade_level":       student.grade_level,
-            "monthly_tuition":   tuition,
-            "collection_rate":   round(collection_rate, 2),
-            "risk_score":        round(risk_score, 2),
-            "risk_level":        risk_level,
-            "reason":            reason,
-            "recent_missed":     sum(1 for p in history if p.status == "missed"),
-            "recent_late":       sum(1 for p in history if p.status == "late"),
-            "recent_paid":       sum(1 for p in history if p.status == "paid"),
-            "expected_payment":  round(tuition * collection_rate),
-        })
+        risk_list.append(
+            {
+                "student_id": str(student.id),
+                "student_name": student.full_name,
+                "payment_cluster": cluster,
+                "grade_level": student.grade_level,
+                "monthly_tuition": tuition,
+                "collection_rate": round(collection_rate, 2),
+                "risk_score": round(risk_score, 2),
+                "risk_level": risk_level,
+                "reason": reason,
+                "recent_missed": sum(1 for p in history if p.status == "missed"),
+                "recent_late": sum(1 for p in history if p.status == "late"),
+                "recent_paid": sum(1 for p in history if p.status == "paid"),
+                "expected_payment": round(tuition * collection_rate),
+            }
+        )
 
     # Sort by risk score descending
     risk_list.sort(key=lambda x: x["risk_score"], reverse=True)
 
-    high_risk   = [r for r in risk_list if r["risk_level"] == "high"]
+    high_risk = [r for r in risk_list if r["risk_level"] == "high"]
     medium_risk = [r for r in risk_list if r["risk_level"] == "medium"]
-    low_risk    = [r for r in risk_list if r["risk_level"] == "low"]
+    low_risk = [r for r in risk_list if r["risk_level"] == "low"]
 
     total_expected = sum(r["expected_payment"] for r in risk_list)
-    total_billed   = sum(GRADE_TUITION.get(s.grade_level, 1000000) for s in active_students)
+    total_billed = sum(
+        GRADE_TUITION.get(s.grade_level, 1000000) for s in active_students
+    )
 
     return {
         "summary": {
-            "total_students":      len(risk_list),
-            "high_risk_count":     len(high_risk),
-            "medium_risk_count":   len(medium_risk),
-            "low_risk_count":      len(low_risk),
-            "total_billed_vnd":    total_billed,
-            "total_expected_vnd":  total_expected,
-            "expected_collection_rate": round(total_expected / total_billed, 2) if total_billed > 0 else 0,
+            "total_students": len(risk_list),
+            "high_risk_count": len(high_risk),
+            "medium_risk_count": len(medium_risk),
+            "low_risk_count": len(low_risk),
+            "total_billed_vnd": total_billed,
+            "total_expected_vnd": total_expected,
+            "expected_collection_rate": (
+                round(total_expected / total_billed, 2) if total_billed > 0 else 0
+            ),
         },
         "students": risk_list,
-        "high_risk":   high_risk,
+        "high_risk": high_risk,
         "medium_risk": medium_risk,
+    }
+
+
+# ============================================================
+# CSP (Day 8)
+#
+# ============================================================
+@router.post("/schedule")
+async def generate_schedule(db: AsyncSession = Depends(get_db)):
+    """
+    CSP-based scheduling engine using backtracking + DAG conflict detection.
+    Assigns time slots to classes while respecting teacher constraints.
+    """
+    # ── 1. Load all active classes with their teachers ──────────────────
+    result = await db.execute(select(ClassModel).where(ClassModel.status == "active"))
+    classes = result.scalars().all()
+
+    if not classes:
+        return {
+            "schedule": [],
+            "conflicts": [],
+            "stats": {"total": 0, "scheduled": 0, "unscheduled": 0},
+        }
+
+    # ── 2. Define domains (possible time slots per class) ────────────────
+    DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    TIME_SLOTS = ["07:00", "09:00", "11:00", "13:00", "15:00", "17:00", "19:00"]
+    DURATIONS = {
+        "primary_1-5": 60,
+        "secondary_6-9": 90,
+        "high_10-12": 90,
+        "starters": 60,
+        "movers": 60,
+        "flyers": 75,
+        "ket": 90,
+        "pet": 90,
+        "fce": 90,
+        "ielts": 120,
+        "toefl": 120,
+        "sat": 120,
+        "general_english": 75,
+    }
+
+    def slots_overlap(day1, start1, dur1, day2, start2, dur2):
+        if day1 != day2:
+            return False
+
+        def to_min(t):
+            h, m = map(int, t.split(":"))
+            return h * 60 + m
+
+        s1, e1 = to_min(start1), to_min(start1) + dur1
+        s2, e2 = to_min(start2), to_min(start2) + dur2
+        return s1 < e2 and s2 < e1
+
+    # ── 3. Backtracking CSP solver ───────────────────────────────────────
+    # assignment: {class_id: (day, time_slot)}
+    assignment = {}
+    # DAG: track teacher → [(day, start, duration)] to detect conflicts
+    teacher_slots = defaultdict(list)
+
+    def is_consistent(cls, day, slot):
+        duration = DURATIONS.get(cls.level, 90)
+        teacher_id = str(cls.teacher_id)
+        for d, s, dur in teacher_slots[teacher_id]:
+            if slots_overlap(day, slot, duration, d, s, dur):
+                return False
+        return True
+
+    def backtrack(index, classes_list):
+        if index == len(classes_list):
+            return True  # all assigned
+        cls = classes_list[index]
+        duration = DURATIONS.get(cls.level, 90)
+
+        # Prefer the class's existing day_of_week if set
+        preferred_days = DAYS.copy()
+        if cls.day_of_week is not None:
+            day_map = {
+                0: "Monday",
+                1: "Tuesday",
+                2: "Wednesday",
+                3: "Thursday",
+                4: "Friday",
+                5: "Saturday",
+                6: "Sunday",
+            }
+            pref = day_map.get(cls.day_of_week)
+            if pref in preferred_days:
+                preferred_days = [pref] + [d for d in preferred_days if d != pref]
+
+        for day in preferred_days:
+            for slot in TIME_SLOTS:
+                if is_consistent(cls, day, slot):
+                    assignment[str(cls.id)] = (day, slot)
+                    teacher_slots[str(cls.teacher_id)].append((day, slot, duration))
+                    if backtrack(index + 1, classes_list):
+                        return True
+                    # backtrack
+                    del assignment[str(cls.id)]
+                    teacher_slots[str(cls.teacher_id)].pop()
+
+        return False  # no valid slot found
+
+    classes_list = list(classes)
+    backtrack(0, classes_list)
+
+    # ── 4. Build response ────────────────────────────────────────────────
+    DURATIONS_out = DURATIONS
+    schedule = []
+    unscheduled = []
+
+    # Load teacher names
+    teacher_ids = list({str(c.teacher_id) for c in classes_list})
+    from app.models.teacher import Teacher
+
+    teachers_result = await db.execute(
+        select(Teacher).where(
+            Teacher.id.in_([uuid_lib.UUID(tid) for tid in teacher_ids])
+        )
+    )
+    teacher_map = {str(t.id): t.full_name for t in teachers_result.scalars().all()}
+
+    for cls in classes_list:
+        cid = str(cls.id)
+        if cid in assignment:
+            day, slot = assignment[cid]
+            duration = DURATIONS_out.get(cls.level, 90)
+            h, m = map(int, slot.split(":"))
+            end_min = h * 60 + m + duration
+            end_time = f"{end_min // 60:02d}:{end_min % 60:02d}"
+            schedule.append(
+                {
+                    "class_id": cid,
+                    "class_name": cls.class_name,
+                    "level": cls.level,
+                    "teacher_name": teacher_map.get(str(cls.teacher_id), "Unknown"),
+                    "day": day,
+                    "start_time": slot,
+                    "end_time": end_time,
+                    "duration_minutes": duration,
+                    "room_capacity": cls.max_students,
+                }
+            )
+        else:
+            unscheduled.append(
+                {
+                    "class_id": cid,
+                    "class_name": cls.class_name,
+                    "reason": "No conflict-free slot available",
+                }
+            )
+
+    # Sort by day then time
+    day_order = {d: i for i, d in enumerate(DAYS)}
+    schedule.sort(key=lambda x: (day_order.get(x["day"], 99), x["start_time"]))
+
+    return {
+        "schedule": schedule,
+        "conflicts": unscheduled,
+        "stats": {
+            "total": len(classes_list),
+            "scheduled": len(schedule),
+            "unscheduled": len(unscheduled),
+            "teachers_involved": len(teacher_ids),
+        },
     }

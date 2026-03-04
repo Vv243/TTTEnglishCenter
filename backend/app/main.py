@@ -10,6 +10,8 @@ from app.api.ml import router as ml_router
 from app.models import payment_history
 load_dotenv()
 
+from app.api.auth import router as auth_router
+
 # Lifespan events (startup/shutdown)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,6 +44,7 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 
 # Health check endpoint
 @app.get("/health")

@@ -10,6 +10,7 @@ import {
   BookOpen,
   UserCircle,
   Brain,
+  Banknote,
 } from "lucide-react";
 
 const navigation = [
@@ -42,6 +43,11 @@ const navigation = [
     name: "ML Insights",
     href: "/ml",
     icon: Brain,
+  },
+  {
+    name: "Payments",
+    href: "/payments",
+    icon: Banknote,
   },
 ];
 
