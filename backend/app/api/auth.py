@@ -41,6 +41,28 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db), _=
     await db.refresh(user)
     return user
 
+@router.post("/refresh", response_model=Token)
+async def refresh_token(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Issue a fresh token for an authenticated user."""
+    token = create_access_token({"sub": current_user.username, "role": current_user.role.value})
+    return Token(access_token=token, token_type="bearer", user=UserOut.model_validate(current_user))
+
 @router.get("/me", response_model=UserOut)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Issue a fresh token for an authenticated user."""
+    token = create_access_token({"sub": current_user.username, "role": current_user.role.value})
+    return Token(
+        access_token=token,
+        token_type="bearer",
+        user=UserOut.model_validate(current_user)
+    )
