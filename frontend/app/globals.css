@@ -32,19 +32,15 @@
     --radius: 0.5rem;
 
     --popover: 0 0% 100%;
-
     --popover-foreground: 0 0% 3.9%;
 
     --chart-1: 12 76% 61%;
-
     --chart-2: 173 58% 39%;
-
     --chart-3: 197 37% 24%;
-
     --chart-4: 43 74% 66%;
-
     --chart-5: 27 87% 67%;
   }
+
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
@@ -77,25 +73,89 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-epilogue), system-ui, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /*
+   * TYPOGRAPHY RULES
+   * ─────────────────────────────────────────
+   * Fraunces  → brand name, page headings, section titles (short English text only)
+   * Epilogue  → everything else, ALL Vietnamese text (names, addresses, nav, tables)
+   * Space Mono → class codes, version strings, data identifiers
+   * ─────────────────────────────────────────
+   */
+
+  /* Page-level headings — Fraunces italic for impact */
+  h1 {
+    font-family: var(--font-fraunces), Georgia, serif;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  /* Section headings — Fraunces upright bold */
+  h2 {
+    font-family: var(--font-fraunces), Georgia, serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  /* Sub-headings — Epilogue bold (handles Vietnamese safely) */
+  h3, h4, h5, h6 {
+    font-family: var(--font-epilogue), system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+  }
+
+  /* Body text — Epilogue for clean Vietnamese rendering */
+  p, span, li, td, th, label, input, textarea, select, button {
+    font-family: var(--font-epilogue), system-ui, sans-serif;
+  }
+
+  /* Table header — slightly tighter tracking */
+  th {
+    @apply text-left font-semibold text-slate-700 text-sm;
+    font-family: var(--font-epilogue), system-ui, sans-serif;
+    letter-spacing: 0.04em;
+  }
+
+  td {
+    @apply text-slate-600 text-sm;
+    font-family: var(--font-epilogue), system-ui, sans-serif;
   }
 }
 
 @layer utilities {
-  .animate-delay-100 {
-    animation-delay: 100ms;
+  /* Font family utilities */
+  .font-fraunces {
+    font-family: var(--font-fraunces), Georgia, serif;
   }
-  .animate-delay-200 {
-    animation-delay: 200ms;
+  .font-epilogue {
+    font-family: var(--font-epilogue), system-ui, sans-serif;
   }
-  .animate-delay-300 {
-    animation-delay: 300ms;
+  .font-mono {
+    font-family: var(--font-space-mono), monospace;
   }
-  .animate-delay-400 {
-    animation-delay: 400ms;
+
+  /* Fraunces italic shorthand — use for brand/display text */
+  .font-display {
+    font-family: var(--font-fraunces), Georgia, serif;
+    font-style: italic;
+    font-weight: 900;
   }
+
+  /* Animation delays */
+  .animate-delay-100 { animation-delay: 100ms; }
+  .animate-delay-200 { animation-delay: 200ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-400 { animation-delay: 400ms; }
 }
 
 /* Custom scrollbar */
@@ -103,28 +163,17 @@
   width: 8px;
   height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   @apply bg-slate-100;
 }
-
 ::-webkit-scrollbar-thumb {
   @apply bg-slate-300 rounded-full;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-400;
 }
 
-/* Table styles */
+/* Table baseline */
 table {
   @apply w-full;
-}
-
-th {
-  @apply text-left font-semibold text-slate-700 text-sm;
-}
-
-td {
-  @apply text-slate-600 text-sm;
 }
