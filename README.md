@@ -5,7 +5,7 @@
 **Live Frontend:** http://localhost:3000  
 **Live API:** http://localhost:8000/docs  
 **Database:** PostgreSQL on port 5433  
-**Status:** 🟢 Day 8 Complete (80%)
+**Status:** 🟢 Day 9 Complete (90%)
 
 ---
 
@@ -46,6 +46,12 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 - **6/6 classes scheduled, 0 conflicts** across 3 teachers
 - **Endpoint:** `POST /ml/schedule`
 
+### Feature 5: Edit & Delete Forms ✅ LIVE
+- **EditStudentModal:** Slide-in panel, pre-populated PATCH `/students/{id}` — all fields including Vietnam 2-tier address
+- **EditClassModal:** Slide-in panel, pre-populated PATCH `/classes/{id}` — level, teacher, schedule, financials
+- **DeleteConfirmDialog:** Reusable soft-delete confirmation — students set `is_active=False`, classes set `status=cancelled`
+- **Action icons** on every student row and class card (pencil = edit, trash = deactivate)
+
 ---
 
 ## 🏗️ Tech Stack
@@ -71,7 +77,7 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 | 6 | ML attendance prediction | ✅ Done |
 | 7 | Address system upgrade + Payment forecasting | ✅ Done |
 | 8 | JWT authentication + CSP scheduling | ✅ Done |
-| 9 | Edit/Delete forms + mobile polish | 📅 Upcoming |
+| 9 | Edit/Delete forms + type fixes | ✅ Done |
 | 10 | Deployment (Vercel + Railway + Neon) | 📅 Upcoming |
 
 ---
@@ -83,8 +89,8 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 | Login | `/login` | ✅ Working (JWT, role-based) |
 | Dashboard | `/` | ✅ Working |
 | Teachers | `/teachers` | ✅ Working (search + role filter) |
-| Students | `/students` | ✅ Working (search + grade/cluster/province filters) |
-| Classes | `/classes` | ✅ Working (card grid) |
+| Students | `/students` | ✅ Working (search + filters + edit/delete) |
+| Classes | `/classes` | ✅ Working (card grid + edit/delete) |
 | Enrollments | `/enrollments` | ✅ Working (attendance + trends) |
 | ML Insights | `/ml` | ✅ Working (Random Forest + CSP scheduler) |
 | Payments | `/payments` | ✅ Working (forecast chart + risk table) |
@@ -135,7 +141,7 @@ EduCore address fields (all optional):
 
 **Rules:**
 - UUID primary keys — never auto-increment
-- Soft deletes — `is_active = false`, never hard delete
+- Soft deletes — `is_active = false` (students), `status = 'cancelled'` (classes) — never hard delete
 - Port 5433 — never change to 5432
 
 ---
@@ -191,6 +197,10 @@ Navigate to http://localhost:3000 — you'll be redirected to `/login`. Use `adm
 | Classes API 500 | Invalid level value — check constraint |
 | Province filter ignored | Backend param is `province_city` not `district` |
 | discount_percent missing | Column is on enrollments, not students table |
+| PATCH/DELETE 307 redirect | All update/delete API calls need trailing slashes |
+| GradeLevel "adult" missing | Syntax error fixed in types/index.ts |
+| parent_zalo_id wrong field | Actual DB column is `parent_zalo` |
+| room wrong field on Class | Actual DB column is `room_number` |
 
 ---
 
@@ -201,4 +211,4 @@ Building for family's tutoring center in Sài Gòn.
 Mom teaches in Sài Gòn · Aunts from Châu Đốc, An Giang.
 
 **Built with ❤️ for Vietnamese English teachers**  
-*Last Updated: March 4, 2026 — Day 8 Complete (80%)*
+*Last Updated: March 9, 2026 — Day 9 Complete (90%)*
