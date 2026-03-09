@@ -14,6 +14,8 @@ export interface Teacher {
 }
 
 // Student types
+// FIXED: "adult" was after a semicolon (syntax error) — corrected
+// FIXED: parent_zalo_id -> parent_zalo (actual DB column name)
 export type GradeLevel =
   | "primary_1"
   | "primary_2"
@@ -26,8 +28,8 @@ export type GradeLevel =
   | "secondary_9"
   | "high_10"
   | "high_11"
-  | "high_12";
-    "adult";
+  | "high_12"
+  | "adult";
 
 export type PaymentCluster =
   | "new_student"
@@ -41,24 +43,28 @@ export interface Student {
   full_name: string;
   date_of_birth: string;
   grade_level: GradeLevel | null;
+  phone: string | null;
+  email: string | null;
   parent_name: string;
   parent_phone: string;
   parent_email: string | null;
-  parent_zalo_id: string | null;
-  parent_whatsapp: string | null;
+  parent_zalo: string | null;         // actual DB column (not parent_zalo_id)
+  secondary_contact_name: string | null;
+  secondary_contact_phone: string | null;
   street_address: string | null;
   ward: string | null;
   province_city: string | null;
   english_level: string | null;
   target_exam: string | null;
+  current_school_name: string | null;
+  current_school_type: string | null;
   notes: string | null;
   payment_cluster: PaymentCluster;
-  previous_center: string | null;
-  referral_source: string | null;
-  emergency_contact: string | null;
   medical_notes: string | null;
   is_active: boolean;
   enrollment_date: string;
+  withdrawal_date: string | null;
+  withdrawal_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -101,19 +107,23 @@ export interface Class {
   day_of_week: number;
   start_time: string;
   end_time: string;
+  room_number: string | null;         // actual DB column (not room)
+  building: string | null;
   level: ClassLevel;
-  room: string | null;
+  curriculum: string | null;
+  textbook: string | null;
   max_students: number;
   current_enrollment: number;
   semester: string | null;
-  academic_year: string | null;
   start_date: string;
   end_date: string;
   total_sessions: number;
+  sessions_per_month: number | null;
   tuition_per_session: number;
   currency: string;
   description: string | null;
-  syllabus_url: string | null;
+  prerequisites: string | null;
+  learning_objectives: string | null;
   status: ClassStatus;
   created_at: string;
   updated_at: string;
@@ -172,7 +182,7 @@ export interface DashboardStats {
   };
   classes: { total: number; by_status: Record<ClassStatus, number> };
   enrollments: { total: number; active: number };
-  teacher_class_count: Array<{ teacher_name: string; class_count: number }>; // ← add this
+  teacher_class_count: Array<{ teacher_name: string; class_count: number }>;
 }
 
 // API Response types

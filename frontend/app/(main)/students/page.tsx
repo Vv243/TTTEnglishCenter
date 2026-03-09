@@ -1,13 +1,15 @@
 "use client";
 
 import AddStudentModal from "@/components/ui/AddStudentModal";
+import EditStudentModal from "@/components/ui/EditStudentModal";
+import DeleteConfirmDialog from "@/components/ui/DeleteConfirmDialog";
 import { useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { studentsAPI } from "@/lib/api";
 import type { Student, PaginatedResponse } from "@/types";
-import { ChevronLeft, ChevronRight, MapPin, Phone, Users, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Phone, Users, Search, X, Pencil, Trash2 } from "lucide-react";
 
 // ---------- Filter State ----------
 interface Filters {
@@ -26,27 +28,28 @@ const INITIAL_FILTERS: Filters = {
 
 const GRADE_LEVELS = [
   { value: "", label: "All Grades" },
-  { value: "primary_1", label: "Primary 1" },
-  { value: "primary_2", label: "Primary 2" },
-  { value: "primary_3", label: "Primary 3" },
-  { value: "primary_4", label: "Primary 4" },
-  { value: "primary_5", label: "Primary 5" },
+  { value: "primary_1",   label: "Primary 1" },
+  { value: "primary_2",   label: "Primary 2" },
+  { value: "primary_3",   label: "Primary 3" },
+  { value: "primary_4",   label: "Primary 4" },
+  { value: "primary_5",   label: "Primary 5" },
   { value: "secondary_6", label: "Secondary 6" },
   { value: "secondary_7", label: "Secondary 7" },
   { value: "secondary_8", label: "Secondary 8" },
   { value: "secondary_9", label: "Secondary 9" },
-  { value: "high_10", label: "High 10" },
-  { value: "high_11", label: "High 11" },
-  { value: "high_12", label: "High 12" },
+  { value: "high_10",     label: "High 10" },
+  { value: "high_11",     label: "High 11" },
+  { value: "high_12",     label: "High 12" },
+  { value: "adult",       label: "Adult Learner" },
 ];
 
 const PAYMENT_CLUSTERS = [
   { value: "", label: "All Clusters" },
-  { value: "always_on_time", label: "Always On Time" },
-  { value: "new_student", label: "New Student" },
-  { value: "needs_reminder", label: "Needs Reminder" },
-  { value: "high_risk", label: "High Risk" },
-  { value: "erratic", label: "Erratic" },
+  { value: "always_on_time",  label: "Always On Time" },
+  { value: "new_student",     label: "New Student" },
+  { value: "needs_reminder",  label: "Needs Reminder" },
+  { value: "high_risk",       label: "High Risk" },
+  { value: "erratic",         label: "Erratic" },
 ];
 
 const VIETNAM_PROVINCES = [
@@ -76,7 +79,7 @@ const formatGradeLevel = (level: string | null) => {
 };
 
 const formatAddress = (student: Student) => {
-  const parts = [student.ward, student.province_city].filter(Boolean);
+  const parts = [(student as any).ward, (student as any).province_city].filter(Boolean);
   return parts.length > 0 ? parts : null;
 };
 
@@ -87,7 +90,12 @@ export default function StudentsPage() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [searchInput, setSearchInput] = useState("");
+
+  // Modal state
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editStudent, setEditStudent] = useState<Student | null>(null);
+  const [deleteStudent, setDeleteStudent] = useState<Student | null>(null);
+
   const perPage = 10;
 
   // Debounce search
@@ -147,6 +155,12 @@ export default function StudentsPage() {
   const handleFilterChange = (key: keyof Omit<Filters, "search">, value: string) => {
     setFilters((f) => ({ ...f, [key]: value }));
     setPage(1);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteStudent) return;
+    await studentsAPI.delete(deleteStudent.id);
+    fetchStudents();
   };
 
   return (
@@ -288,6 +302,7 @@ export default function StudentsPage() {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Location</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -296,7 +311,7 @@ export default function StudentsPage() {
                   return (
                     <tr
                       key={student.id}
-                      className="hover:bg-slate-50 transition-colors animate-fade-in cursor-pointer"
+                      className="hover:bg-slate-50 transition-colors animate-fade-in"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       {/* Student */}
@@ -345,11 +360,11 @@ export default function StudentsPage() {
                           <MapPin className="h-3 w-3 mt-0.5 flex-shrink-0" />
                           {address ? (
                             <div>
-                              {student.ward && (
-                                <p className="font-medium">{student.ward}</p>
+                              {(student as any).ward && (
+                                <p className="font-medium">{(student as any).ward}</p>
                               )}
-                              {student.province_city && (
-                                <p className="text-xs text-slate-500">{student.province_city}</p>
+                              {(student as any).province_city && (
+                                <p className="text-xs text-slate-500">{(student as any).province_city}</p>
                               )}
                             </div>
                           ) : (
@@ -370,6 +385,26 @@ export default function StudentsPage() {
                         <Badge variant={student.is_active ? "success" : "outline"}>
                           {student.is_active ? "Active" : "Inactive"}
                         </Badge>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setEditStudent(student)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                            title="Edit student"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteStudent(student)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Deactivate student"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -413,10 +448,27 @@ export default function StudentsPage() {
         )}
       </Card>
 
+      {/* Modals */}
       <AddStudentModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSuccess={fetchStudents}
+      />
+
+      <EditStudentModal
+        student={editStudent}
+        isOpen={!!editStudent}
+        onClose={() => setEditStudent(null)}
+        onSuccess={fetchStudents}
+      />
+
+      <DeleteConfirmDialog
+        isOpen={!!deleteStudent}
+        onClose={() => setDeleteStudent(null)}
+        onConfirm={handleDelete}
+        title={`Deactivate ${deleteStudent?.full_name ?? "student"}?`}
+        description={`This will mark ${deleteStudent?.full_name ?? "this student"} as inactive. Their enrollment records and payment history will be preserved.`}
+        confirmLabel="Deactivate Student"
       />
     </div>
   );

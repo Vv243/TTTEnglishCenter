@@ -4,9 +4,11 @@ import { useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import EditClassModal from "@/components/ui/EditClassModal";
+import DeleteConfirmDialog from "@/components/ui/DeleteConfirmDialog";
 import { classesAPI } from "@/lib/api";
 import type { Class, PaginatedResponse } from "@/types";
-import { ChevronLeft, ChevronRight, Clock, Calendar, Users, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Calendar, Users, Search, X, Pencil, Trash2 } from "lucide-react";
 
 const DAYS_OF_WEEK = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
@@ -25,7 +27,7 @@ const DAY_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Statuses" },
-  { value: "active", label: "Active" },
+  { value: "active",    label: "Active" },
   { value: "scheduled", label: "Scheduled" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
@@ -34,28 +36,28 @@ const STATUS_OPTIONS = [
 const LEVEL_OPTIONS = [
   { value: "", label: "All Levels", disabled: false },
   { value: "", label: "── School Reinforcement ──", disabled: true },
-  { value: "primary_1", label: "Primary 1", disabled: false },
-  { value: "primary_2", label: "Primary 2", disabled: false },
-  { value: "primary_3", label: "Primary 3", disabled: false },
-  { value: "primary_4", label: "Primary 4", disabled: false },
-  { value: "primary_5", label: "Primary 5", disabled: false },
-  { value: "secondary_6", label: "Secondary 6", disabled: false },
-  { value: "secondary_7", label: "Secondary 7", disabled: false },
-  { value: "secondary_8", label: "Secondary 8", disabled: false },
-  { value: "secondary_9", label: "Secondary 9", disabled: false },
-  { value: "high_10", label: "High 10", disabled: false },
-  { value: "high_11", label: "High 11", disabled: false },
-  { value: "high_12", label: "High 12", disabled: false },
+  { value: "primary_1",       label: "Primary 1",      disabled: false },
+  { value: "primary_2",       label: "Primary 2",      disabled: false },
+  { value: "primary_3",       label: "Primary 3",      disabled: false },
+  { value: "primary_4",       label: "Primary 4",      disabled: false },
+  { value: "primary_5",       label: "Primary 5",      disabled: false },
+  { value: "secondary_6",     label: "Secondary 6",    disabled: false },
+  { value: "secondary_7",     label: "Secondary 7",    disabled: false },
+  { value: "secondary_8",     label: "Secondary 8",    disabled: false },
+  { value: "secondary_9",     label: "Secondary 9",    disabled: false },
+  { value: "high_10",         label: "High 10",        disabled: false },
+  { value: "high_11",         label: "High 11",        disabled: false },
+  { value: "high_12",         label: "High 12",        disabled: false },
   { value: "", label: "── Foreign Exam ──", disabled: true },
-  { value: "starters", label: "Starters", disabled: false },
-  { value: "movers", label: "Movers", disabled: false },
-  { value: "flyers", label: "Flyers", disabled: false },
-  { value: "ket", label: "KET (A2)", disabled: false },
-  { value: "pet", label: "PET (B1)", disabled: false },
-  { value: "fce", label: "FCE (B2)", disabled: false },
-  { value: "ielts", label: "IELTS", disabled: false },
-  { value: "toefl", label: "TOEFL", disabled: false },
-  { value: "sat", label: "SAT", disabled: false },
+  { value: "starters",        label: "Starters",       disabled: false },
+  { value: "movers",          label: "Movers",         disabled: false },
+  { value: "flyers",          label: "Flyers",         disabled: false },
+  { value: "ket",             label: "KET (A2)",       disabled: false },
+  { value: "pet",             label: "PET (B1)",       disabled: false },
+  { value: "fce",             label: "FCE (B2)",       disabled: false },
+  { value: "ielts",           label: "IELTS",          disabled: false },
+  { value: "toefl",           label: "TOEFL",          disabled: false },
+  { value: "sat",             label: "SAT",            disabled: false },
   { value: "", label: "── General ──", disabled: true },
   { value: "general_english", label: "General English", disabled: false },
 ];
@@ -71,7 +73,7 @@ const getStatusColor = (status: string) => {
 };
 
 const formatLevel    = (level: string) => level.replace(/_/g, " ").toUpperCase();
-const formatTime     = (time: string)  => time.slice(0, 5);
+const formatTime     = (time: string)  => time ? time.slice(0, 5) : "--:--";
 const formatCurrency = (amount: number) => new Intl.NumberFormat("vi-VN").format(amount);
 
 interface Filters {
@@ -89,6 +91,11 @@ export default function ClassesPage() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [searchInput, setSearchInput] = useState("");
+
+  // Modal state
+  const [editClass, setEditClass] = useState<Class | null>(null);
+  const [deleteClass, setDeleteClass] = useState<Class | null>(null);
+
   const perPage = 10;
 
   useEffect(() => {
@@ -106,7 +113,6 @@ export default function ClassesPage() {
       if (filters.status)      params.status      = filters.status;
       if (filters.level)       params.level       = filters.level;
       if (filters.day_of_week) params.day_of_week = Number(filters.day_of_week);
-
       const result = await classesAPI.getAll(params);
       setData(result);
     } catch (error) {
@@ -131,6 +137,12 @@ export default function ClassesPage() {
   const handleFilterChange = (key: keyof Omit<Filters, "search">, value: string) => {
     setFilters((f) => ({ ...f, [key]: value }));
     setPage(1);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteClass) return;
+    await classesAPI.delete(deleteClass.id);
+    fetchClasses();
   };
 
   return (
@@ -212,13 +224,36 @@ export default function ClassesPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {classes.map((classItem, index) => (
-            <Card key={classItem.id} className="p-6 hover:shadow-lg transition-all animate-fade-in cursor-pointer" style={{ animationDelay: `${index * 50}ms` }}>
+            <Card
+              key={classItem.id}
+              className="p-6 hover:shadow-lg transition-all animate-fade-in"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              {/* Card header — name + status + action buttons */}
               <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-1">{classItem.class_name}</h3>
+                <div className="flex-1 min-w-0 mr-3">
+                  <h3 className="text-xl font-bold text-slate-900 mb-1 truncate">{classItem.class_name}</h3>
                   <p className="text-sm font-mono text-slate-500">{classItem.class_code}</p>
                 </div>
-                <Badge variant={getStatusColor(classItem.status)}>{classItem.status.toUpperCase()}</Badge>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Badge variant={getStatusColor(classItem.status)}>{classItem.status.toUpperCase()}</Badge>
+                  {/* Edit button */}
+                  <button
+                    onClick={() => setEditClass(classItem)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                    title="Edit class"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  {/* Delete button */}
+                  <button
+                    onClick={() => setDeleteClass(classItem)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Cancel class"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="mb-4">
@@ -230,7 +265,7 @@ export default function ClassesPage() {
               <div className="space-y-2 mb-4">
                 <div className="flex items-center gap-3 text-sm text-slate-600">
                   <Calendar className="h-4 w-4" />
-                  <span className="font-medium">{DAYS_OF_WEEK[classItem.day_of_week]}</span>
+                  <span className="font-medium">{DAYS_OF_WEEK[classItem.day_of_week] ?? "TBD"}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-slate-600">
                   <Clock className="h-4 w-4" />
@@ -238,18 +273,25 @@ export default function ClassesPage() {
                 </div>
                 <div className="flex items-center gap-3 text-sm text-slate-600">
                   <Users className="h-4 w-4" />
-                  <span><span className="font-semibold text-slate-900">{classItem.current_enrollment}</span> / {classItem.max_students} students</span>
+                  <span>
+                    <span className="font-semibold text-slate-900">{classItem.current_enrollment}</span>
+                    {" / "}{classItem.max_students} students
+                  </span>
                 </div>
               </div>
 
+              {/* Enrollment bar */}
               <div className="mb-4">
                 <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all"
-                    style={{ width: `${Math.min((classItem.current_enrollment / classItem.max_students) * 100, 100)}%` }} />
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all"
+                    style={{ width: `${Math.min((classItem.current_enrollment / classItem.max_students) * 100, 100)}%` }}
+                  />
                 </div>
                 <p className="text-xs text-slate-400 mt-1">{classItem.max_students - classItem.current_enrollment} spots remaining</p>
               </div>
 
+              {/* Footer */}
               <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                 <div>
                   <p className="text-xs text-slate-500">Tuition per session</p>
@@ -284,6 +326,23 @@ export default function ClassesPage() {
           </div>
         </Card>
       )}
+
+      {/* Modals */}
+      <EditClassModal
+        classItem={editClass}
+        isOpen={!!editClass}
+        onClose={() => setEditClass(null)}
+        onSuccess={fetchClasses}
+      />
+
+      <DeleteConfirmDialog
+        isOpen={!!deleteClass}
+        onClose={() => setDeleteClass(null)}
+        onConfirm={handleDelete}
+        title={`Cancel "${deleteClass?.class_name ?? "class"}"?`}
+        description={`This will mark ${deleteClass?.class_name ?? "this class"} as cancelled. Enrollments and payment history are preserved.`}
+        confirmLabel="Cancel Class"
+      />
     </div>
   );
 }
