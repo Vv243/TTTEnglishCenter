@@ -5,15 +5,16 @@
 **Live Frontend:** http://localhost:3000  
 **Live API:** http://localhost:8000/docs  
 **Database:** PostgreSQL on port 5433  
-**Status:** 🟢 Day 9 Complete (90%)
+**Status:** 🔄 Day 10 In Progress (95%)
 
 ---
 
 ## 🎯 Project Overview
 
-Building a comprehensive management system for Vietnamese English tutoring centers that serves 3 teachers managing 90+ students. This 10-week capstone project demonstrates serious engineering skills while solving real operational challenges.
+Building a comprehensive management system for Vietnamese English tutoring centers that serves 3 teachers managing 90+ students. This capstone project demonstrates serious engineering skills while solving real operational challenges for a real family business.
 
-**Primary Users:** My mom (English teacher in Sài Gòn) and two aunts (from Châu Đốc, An Giang)  
+**Primary Users:** My mom (English teacher in Sài Gòn) and two aunts (from Châu Đốc, An Giang) — non-technical daily users  
+**Admin Access:** Vinh (US-based) for remote oversight and error correction  
 **Target Market:** Vietnamese tutoring centers (10-30 teachers)  
 **Student Demographics:** Ages 7-18 (Primary through IELTS/SAT prep) + Adult Learners
 
@@ -21,36 +22,43 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 
 ## 🚀 Core Features
 
-### Feature 1: ML-Powered Attendance Prediction ✅ LIVE
-- **Random Forest Regressor:** Predicts attendance using payment cluster, grade level, discount, score
-- **At-Risk Detection:** Flags students predicted below 70% attendance
-- **31 enrollments analyzed**, at-risk students identified, confidence: high
+### ✅ ML-Powered Attendance Prediction
+- **Random Forest Regressor** predicts attendance using payment cluster, grade level, discount, score
+- At-risk detection flags students predicted below 70% attendance
+- 31 enrollments analyzed with high confidence
 
-### Feature 2: Payment Intelligence ✅ LIVE
-- **Hybrid Forecasting:** Rule-based core × Facebook Prophet trend multiplier
-- **90-day revenue forecast** with confidence bands (±15%)
-- **Per-student risk scoring** blending payment cluster probability with actual history
-- **Endpoints:** `/ml/payment-forecast`, `/ml/payment-risk`
+### ✅ Payment Intelligence (ML Forecasting)
+- **Hybrid forecasting:** Rule-based core × Facebook Prophet trend multiplier
+- 90-day revenue forecast with ±15% confidence bands
+- Per-student risk scoring blending payment cluster probability with actual history
 
-### Feature 3: JWT Authentication ✅ LIVE
-- **Role-based access control:** Admin and Teacher roles
-- **bcrypt password hashing** with secure JWT token generation (8hr expiry)
-- **Next.js middleware** protecting all routes, redirecting to `/login`
-- **Route groups:** `(main)/` isolates sidebar/header from login page
-- **Default accounts:** admin/admin123, teacher accounts for all 3 teachers
+### ✅ JWT Authentication & Role-Based Access
+- Admin and Teacher roles with bcrypt password hashing
+- Next.js middleware protecting all routes
+- Route groups isolate sidebar/header from login page
 
-### Feature 4: CSP Smart Scheduling ✅ LIVE
-- **Backtracking CSP solver** with DAG conflict detection
-- **Duration-aware slots** per class level (60–120 min)
-- **Teacher conflict prevention** across 6 concurrent classes
-- **6/6 classes scheduled, 0 conflicts** across 3 teachers
-- **Endpoint:** `POST /ml/schedule`
+### ✅ CSP Smart Scheduling
+- Backtracking CSP solver with DAG conflict detection
+- Duration-aware slots per class level (60–120 min)
+- 6/6 classes scheduled, 0 conflicts across 3 teachers
 
-### Feature 5: Edit & Delete Forms ✅ LIVE
-- **EditStudentModal:** Slide-in panel, pre-populated PATCH `/students/{id}` — all fields including Vietnam 2-tier address
-- **EditClassModal:** Slide-in panel, pre-populated PATCH `/classes/{id}` — level, teacher, schedule, financials
-- **DeleteConfirmDialog:** Reusable soft-delete confirmation — students set `is_active=False`, classes set `status=cancelled`
-- **Action icons** on every student row and class card (pencil = edit, trash = deactivate)
+### ✅ Multi-Day Class Scheduling
+- Classes can run Mon/Wed/Fri, Tue/Thu, etc. (integer[] array in DB)
+- Day toggle buttons in both Add and Edit class modals
+- Auto-computes total sessions and sessions/month from date range + days selected
+
+### ✅ Full CRUD with Soft Deletes
+- Edit/Delete modals for Students and Classes
+- Students: `is_active = false` | Classes: `status = 'cancelled'` — never hard delete
+- All write endpoints protected by JWT
+
+### 🔄 Payment Tracker (Day 10 — In Progress)
+- **Class-first monthly view:** each class card shows paid/overdue/due counts
+- **Expand class** → see each enrolled student's payment status for that month
+- **Actions:** Mark Paid (cash/bank transfer), Postpone (requires reason + new date), Waive (requires reason)
+- **Student history modal:** full payment timeline per student
+- **Receipt printing:** bilingual Vietnamese receipt via `window.print()`
+- **Enrollment auto-confirm:** first payment flips enrollment to Active
 
 ---
 
@@ -78,7 +86,9 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 | 7 | Address system upgrade + Payment forecasting | ✅ Done |
 | 8 | JWT authentication + CSP scheduling | ✅ Done |
 | 9 | Edit/Delete forms + type fixes | ✅ Done |
-| 10 | Deployment (Vercel + Railway + Neon) | 📅 Upcoming |
+| 10 | Payment Tracker + Polish | 🔄 In Progress |
+| 11 | Pre-deployment polish + bug fixes | 📅 Upcoming |
+| 12 | Deployment (Vercel + Railway + Neon) | 📅 Upcoming |
 
 ---
 
@@ -88,12 +98,35 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 |------|-------|--------|
 | Login | `/login` | ✅ Working (JWT, role-based) |
 | Dashboard | `/` | ✅ Working |
-| Teachers | `/teachers` | ✅ Working (search + role filter) |
+| Teachers | `/teachers` | ✅ Working (search + role filter + add teacher) |
 | Students | `/students` | ✅ Working (search + filters + edit/delete) |
-| Classes | `/classes` | ✅ Working (card grid + edit/delete) |
-| Enrollments | `/enrollments` | ✅ Working (attendance + trends) |
+| Classes | `/classes` | ✅ Working (multi-day toggles, start/end dates, edit/delete) |
+| Enrollments | `/enrollments` | ✅ Working (active+scheduled classes, 3 status options) |
 | ML Insights | `/ml` | ✅ Working (Random Forest + CSP scheduler) |
-| Payments | `/payments` | ✅ Working (forecast chart + risk table) |
+| Payments | `/payments` | 🔄 Day 10 — adding Monthly Tracker tab |
+
+---
+
+## 💰 Payment System
+
+### Payment Methods
+- **Tiền mặt** (Cash)
+- **Chuyển khoản** (Bank Transfer)
+
+### Payment Actions
+| Action | Vietnamese | Effect |
+|--------|-----------|--------|
+| Mark Paid | Đã thanh toán | Records payment, flips enrollment to Active |
+| Postpone | Hoãn thanh toán | Records late + new due date, requires reason |
+| Waive | Miễn học phí | Records as paid at 0₫, requires reason |
+
+### Monthly Tracker Flow
+1. Open **Payments → Monthly Tracker**
+2. See all active/scheduled classes for selected month
+3. Classes sorted: overdue → due → all paid
+4. Expand class → see each student's status
+5. One-click Mark Paid for normal payments
+6. Postpone/Waive open a reason form
 
 ---
 
@@ -108,7 +141,7 @@ Default accounts seeded at setup:
 | co_mai | teacher123 | Teacher |
 | thay_duc | teacher123 | Teacher |
 
-JWT tokens expire after 8 hours. All write endpoints (POST/PATCH/DELETE) require a valid Bearer token.
+JWT tokens expire after 8 hours. All write endpoints (POST/PATCH/DELETE) require Bearer token.
 
 ---
 
@@ -120,13 +153,7 @@ As of July 1, 2025, Vietnam moved from a 3-tier to a 2-tier administrative syste
 - **New:** Province → Ward (Phường/Xã) — district level eliminated
 - **Provinces:** Reduced from 63 to 34
 
-EduCore address fields (all optional):
-
-| Field | Example |
-|-------|---------|
-| `street_address` | 45A Nguyễn Đình Chiểu |
-| `ward` | Phường Đa Kao OR Quận 1 (both accepted) |
-| `province_city` | TP. Hồ Chí Minh (dropdown of 34 + free text) |
+EduCore accepts both old-style ("Quận 1") and new-style ("Phường Bến Nghé") ward entries.
 
 ---
 
@@ -136,32 +163,18 @@ EduCore address fields (all optional):
 
 **Tables:**
 - `teachers`, `students`, `classes`, `enrollments` — core data
-- `payment_history` — 6 months of payment records (Jul–Dec 2025)
+- `payment_history` — payment records with method, note, recorded_by, enrollment_id
 - `users` — admin/teacher accounts with bcrypt hashed passwords
 
 **Rules:**
-- UUID primary keys — never auto-increment
-- Soft deletes — `is_active = false` (students), `status = 'cancelled'` (classes) — never hard delete
+- UUID primary keys everywhere
+- Soft deletes only — `is_active = false` (students), `status = 'cancelled'` (classes)
 - Port 5433 — never change to 5432
 
 ---
 
-## 🤖 ML & Auth Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/auth/login` | POST | Login, returns JWT token |
-| `/auth/register` | POST | Register user (admin only) |
-| `/auth/me` | GET | Get current user info |
-| `/ml/predict-attendance/{id}` | GET | Predict attendance for one enrollment |
-| `/ml/attendance-summary` | GET | Predict attendance for all active enrollments |
-| `/ml/payment-forecast` | GET | 90-day revenue forecast |
-| `/ml/payment-risk` | GET | Per-student payment risk ranking |
-| `/ml/schedule` | POST | Generate conflict-free timetable via CSP |
-
----
-
 ## 🚀 Quick Start (Windows PowerShell)
+
 ```powershell
 # 1. Start Docker services
 docker-compose up -d
@@ -191,7 +204,7 @@ Navigate to http://localhost:3000 — you'll be redirected to `/login`. Use `adm
 | Issue | Fix |
 |-------|-----|
 | passlib + modern bcrypt conflict | `pip install bcrypt==4.0.1` |
-| PowerShell $ interpolation corrupts hashes | Write SQL via Python script file, not here-string |
+| PowerShell $ interpolation corrupts hashes | Write SQL via Python script file |
 | Hydration error in Header | Read cookie in useEffect, not during render |
 | Login page shows sidebar | Use (main) route group + bare root layout.tsx |
 | Classes API 500 | Invalid level value — check constraint |
@@ -201,14 +214,19 @@ Navigate to http://localhost:3000 — you'll be redirected to `/login`. Use `adm
 | GradeLevel "adult" missing | Syntax error fixed in types/index.ts |
 | parent_zalo_id wrong field | Actual DB column is `parent_zalo` |
 | room wrong field on Class | Actual DB column is `room_number` |
+| semester NOT NULL violation | ALTER TABLE classes ALTER COLUMN semester DROP NOT NULL |
+| Class card showing wrong day | Fixed to use days_of_week array |
+| EditClassModal single day only | Replaced with 7 toggle buttons |
+| Enrollment picker requires typing | Changed to always show classes on open |
+| Scheduled classes missing from enrollment | Filter changed to active OR scheduled |
 
 ---
 
 ## 👨‍💻 Author
 
-**Vinh Pham** — 10-week capstone (February–April 2026)  
+**Vinh Pham** — capstone project (February–April 2026)  
 Building for family's tutoring center in Sài Gòn.  
 Mom teaches in Sài Gòn · Aunts from Châu Đốc, An Giang.
 
 **Built with ❤️ for Vietnamese English teachers**  
-*Last Updated: March 9, 2026 — Day 9 Complete (90%)*
+*Last Updated: March 9, 2026 — Day 10 In Progress (95%)*

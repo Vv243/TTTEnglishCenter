@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import joinedload
 from typing import List, Optional
 from uuid import UUID
 from datetime import date
@@ -24,7 +25,7 @@ async def get_enrollments(
     class_id: Optional[UUID] = Query(None, description="Filter by class ID"),
     db: AsyncSession = Depends(get_db)
 ):
-    query = select(EnrollmentModel)
+    query = select(EnrollmentModel).options(joinedload(EnrollmentModel.student), joinedload(EnrollmentModel.class_))
 
     if status:
         query = query.where(EnrollmentModel.status == status)
@@ -161,3 +162,7 @@ async def delete_enrollment(
         enrollment.drop_date = date.today()
     await db.commit()
     return None
+
+
+
+

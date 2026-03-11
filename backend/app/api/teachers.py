@@ -59,3 +59,36 @@ async def get_teacher(
         raise HTTPException(status_code=404, detail="Teacher not found")
     
     return teacher
+
+@router.post("/", response_model=Teacher)
+async def create_teacher(
+    teacher_data: TeacherCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new teacher profile"""
+    # Check email uniqueness
+    existing = await db.execute(
+        select(TeacherModel).where(TeacherModel.email == teacher_data.email)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="A teacher with this email already exists")
+
+    # Hash the password before storing — teachers table has password_hash NOT NULL
+    from app.core.auth import hash_password
+
+    teacher = TeacherModel(
+        email=teacher_data.email,
+        full_name=teacher_data.full_name,
+        phone=teacher_data.phone,
+        zalo_id=teacher_data.zalo_id,
+        whatsapp_number=teacher_data.whatsapp_number,
+        role=teacher_data.role,
+        is_active=teacher_data.is_active,
+        bio=teacher_data.bio,
+        specializations=teacher_data.specializations or [],
+        password_hash=hash_password(teacher_data.password),
+    )
+    db.add(teacher)
+    await db.commit()
+    await db.refresh(teacher)
+    return teacher

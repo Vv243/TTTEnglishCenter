@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, Integer, Date, Time, Numeric, Boolean, CheckConstraint, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String, Integer, Date, Time, Numeric, Boolean, CheckConstraint, ForeignKey, ARRAY
 import uuid
 
 from app.models.base import Base, TimestampMixin
@@ -20,7 +21,8 @@ class Class(Base, TimestampMixin):
     assistant_teacher_id = Column(UUID(as_uuid=True), ForeignKey('teachers.id', ondelete='SET NULL'), index=True)
     
     # Schedule
-    day_of_week = Column(Integer, nullable=False)  # 0=Monday, 6=Sunday
+    day_of_week = Column(Integer, nullable=False)  # 0=Sunday, 6=Saturday
+    days_of_week = Column(ARRAY(Integer), nullable=False, default=list)  # 0=Monday, 6=Sunday
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
     

@@ -38,16 +38,8 @@ const CLASS_STATUSES = [
   { value: "cancelled",  label: "Cancelled" },
 ];
 
-const DAYS_OF_WEEK = [
-  { value: "",  label: "Not set" },
-  { value: "0", label: "Monday" },
-  { value: "1", label: "Tuesday" },
-  { value: "2", label: "Wednesday" },
-  { value: "3", label: "Thursday" },
-  { value: "4", label: "Friday" },
-  { value: "5", label: "Saturday" },
-  { value: "6", label: "Sunday" },
-];
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_FULL   = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 interface EditClassForm {
   class_name: string;
@@ -56,7 +48,6 @@ interface EditClassForm {
   status: string;
   teacher_id: string;
   assistant_teacher_id: string;
-  day_of_week: string;
   start_time: string;
   end_time: string;
   room: string;
@@ -82,7 +73,6 @@ const toFormValues = (c: Class): EditClassForm => ({
   status:               c.status,
   teacher_id:           c.teacher_id,
   assistant_teacher_id: c.assistant_teacher_id ?? "",
-  day_of_week:          c.day_of_week != null ? String(c.day_of_week) : "",
   start_time:           c.start_time ?? "",
   end_time:             c.end_time ?? "",
   room:                 c.room_number ?? "",
@@ -94,9 +84,16 @@ const toFormValues = (c: Class): EditClassForm => ({
   description:          c.description ?? "",
 });
 
+const toDaysOfWeek = (c: Class): number[] => {
+  if (c.days_of_week?.length > 0) return c.days_of_week;
+  if (c.day_of_week != null) return [c.day_of_week];
+  return [];
+};
+
 export default function EditClassModal({ classItem, isOpen, onClose, onSuccess }: Props) {
   const [form, setForm] = useState<EditClassForm | null>(null);
-  const [errors, setErrors] = useState<Partial<EditClassForm>>({});
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [errors, setErrors] = useState<Partial<EditClassForm> & { days?: string }>({});
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState("");
@@ -108,6 +105,7 @@ export default function EditClassModal({ classItem, isOpen, onClose, onSuccess }
   useEffect(() => {
     if (classItem) {
       setForm(toFormValues(classItem));
+      setSelectedDays(toDaysOfWeek(classItem));
       setErrors({});
       setApiError("");
     }
@@ -122,15 +120,23 @@ export default function EditClassModal({ classItem, isOpen, onClose, onSuccess }
 
   const set = (field: keyof EditClassForm, value: string) => {
     setForm((f) => f ? { ...f, [field]: value } : f);
-    if (errors[field]) setErrors((e) => ({ ...e, [field]: "" }));
+    if (errors[field as keyof typeof errors]) setErrors((e) => ({ ...e, [field]: "" }));
+  };
+
+  const toggleDay = (day: number) => {
+    setSelectedDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort((a, b) => a - b)
+    );
+    if (errors.days) setErrors((e) => ({ ...e, days: "" }));
   };
 
   const validate = (): boolean => {
-    const e: Partial<EditClassForm> = {};
+    const e: Partial<EditClassForm> & { days?: string } = {};
     if (!form.class_name.trim()) e.class_name = "Class name is required";
     if (!form.class_code.trim()) e.class_code = "Class code is required";
     if (!form.level)             e.level      = "Level is required";
     if (!form.teacher_id)        e.teacher_id = "Main teacher is required";
+    if (selectedDays.length === 0) e.days     = "Select at least one day";
     if (form.max_students && isNaN(Number(form.max_students)))
       e.max_students = "Must be a number";
     if (form.tuition_per_session && isNaN(Number(form.tuition_per_session)))
@@ -145,15 +151,16 @@ export default function EditClassModal({ classItem, isOpen, onClose, onSuccess }
     setApiError("");
     try {
       const payload: Record<string, unknown> = {
-        class_name: form.class_name.trim(),
-        class_code: form.class_code.trim(),
-        level:      form.level,
-        status:     form.status,
-        teacher_id: form.teacher_id,
+        class_name:    form.class_name.trim(),
+        class_code:    form.class_code.trim(),
+        level:         form.level,
+        status:        form.status,
+        teacher_id:    form.teacher_id,
+        days_of_week:  selectedDays,
+        day_of_week:   selectedDays[0] ?? 0,  // backward compat
       };
 
       if (form.assistant_teacher_id) payload.assistant_teacher_id = form.assistant_teacher_id;
-      if (form.day_of_week !== "")   payload.day_of_week = Number(form.day_of_week);
       if (form.start_time)           payload.start_time  = form.start_time;
       if (form.end_time)             payload.end_time    = form.end_time;
       if (form.room)                 payload.room_number = form.room.trim();
@@ -262,12 +269,36 @@ export default function EditClassModal({ classItem, isOpen, onClose, onSuccess }
           </Section>
 
           <Section title="Schedule">
-            <div className="grid grid-cols-3 gap-4">
-              <Field label="Day of Week">
-                <select value={form.day_of_week} onChange={(e) => set("day_of_week", e.target.value)} className={inputCls(false)}>
-                  {DAYS_OF_WEEK.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-                </select>
-              </Field>
+            {/* Days of Week toggles */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Days of Week <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {DAY_LABELS.map((label, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => toggleDay(idx)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                      selectedDays.includes(idx)
+                        ? "bg-amber-500 border-amber-500 text-white shadow-sm"
+                        : "bg-white border-slate-200 text-slate-600 hover:border-amber-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {selectedDays.length > 0 && (
+                <p className="mt-2 text-xs text-slate-500">
+                  {selectedDays.map((d) => DAY_FULL[d]).join(" · ")}
+                </p>
+              )}
+              {errors.days && <p className="mt-1 text-xs text-red-600">{errors.days}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <Field label="Start Time">
                 <input type="time" value={form.start_time} onChange={(e) => set("start_time", e.target.value)} className={inputCls(false)} />
               </Field>

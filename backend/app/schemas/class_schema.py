@@ -15,6 +15,7 @@ class ClassBase(BaseModel):
     
     # Schedule
     day_of_week: int = Field(..., ge=0, le=6, description="0=Monday, 6=Sunday")
+    days_of_week: List[int] = Field(default_factory=list)
     start_time: time
     end_time: time
     
@@ -35,10 +36,10 @@ class ClassBase(BaseModel):
     max_students: int = Field(default=15, ge=1, le=30)
     
     # Semester
-    semester: str = Field(..., max_length=20)
+    semester: Optional[str] = Field(None, max_length=20)
     start_date: date
     end_date: date
-    total_sessions: int = Field(..., gt=0)
+    total_sessions: int = Field(default=0, ge=0)
     sessions_per_month: int = Field(default=4, ge=1, le=20)
     
     # Pricing
@@ -63,6 +64,7 @@ class ClassUpdate(BaseModel):
     teacher_id: Optional[UUID] = None
     assistant_teacher_id: Optional[UUID] = None
     day_of_week: Optional[int] = Field(None, ge=0, le=6)
+    days_of_week: Optional[List[int]] = None
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     room_number: Optional[str] = None
@@ -98,3 +100,4 @@ class ClassList(BaseModel):
     total: int
     page: int
     page_size: int
+

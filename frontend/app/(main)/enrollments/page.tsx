@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import AddEnrollmentModal from "@/components/ui/AddEnrollmentModal";
 import { enrollmentsAPI } from "@/lib/api";
 import type { Enrollment, PaginatedResponse } from "@/types";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus, Search, X } from "lucide-react";
@@ -57,6 +58,7 @@ export default function EnrollmentsPage() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [searchInput, setSearchInput] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
   const perPage = 10;
 
   useEffect(() => {
@@ -111,7 +113,12 @@ export default function EnrollmentsPage() {
             {data ? `${data.total} enrollments total` : "Track student progress and class assignments"}
           </p>
         </div>
-        <Button className="bg-amber-500 hover:bg-amber-600 text-white">+ New Enrollment</Button>
+        <Button
+          className="bg-amber-500 hover:bg-amber-600 text-white"
+          onClick={() => setShowAddModal(true)}
+        >
+          + New Enrollment
+        </Button>
       </div>
 
       {/* Filters */}
@@ -279,6 +286,13 @@ export default function EnrollmentsPage() {
           </div>
         )}
       </Card>
+
+      {/* Add Enrollment Modal */}
+      <AddEnrollmentModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={fetchEnrollments}
+      />
     </div>
   );
 }

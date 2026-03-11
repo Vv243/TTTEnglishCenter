@@ -1,0 +1,295 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { teachersAPI } from "@/lib/api";
+import api from "@/lib/api";
+import type { Teacher, ClassLevel } from "@/types";
+import { X } from "lucide-react";
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+const LEVEL_OPTIONS: { value: ClassLevel; label: string; group: string }[] = [
+  // School Reinforcement
+  { value: "primary_1", label: "Primary 1", group: "School Reinforcement" },
+  { value: "primary_2", label: "Primary 2", group: "School Reinforcement" },
+  { value: "primary_3", label: "Primary 3", group: "School Reinforcement" },
+  { value: "primary_4", label: "Primary 4", group: "School Reinforcement" },
+  { value: "primary_5", label: "Primary 5", group: "School Reinforcement" },
+  { value: "secondary_6", label: "Secondary 6", group: "School Reinforcement" },
+  { value: "secondary_7", label: "Secondary 7", group: "School Reinforcement" },
+  { value: "secondary_8", label: "Secondary 8", group: "School Reinforcement" },
+  { value: "secondary_9", label: "Secondary 9", group: "School Reinforcement" },
+  { value: "high_10", label: "High 10", group: "School Reinforcement" },
+  { value: "high_11", label: "High 11", group: "School Reinforcement" },
+  { value: "high_12", label: "High 12", group: "School Reinforcement" },
+  // Foreign Exam
+  { value: "starters", label: "Starters (YLE)", group: "Foreign Exam" },
+  { value: "movers", label: "Movers (YLE)", group: "Foreign Exam" },
+  { value: "flyers", label: "Flyers (YLE)", group: "Foreign Exam" },
+  { value: "ket", label: "KET (A2)", group: "Foreign Exam" },
+  { value: "pet", label: "PET (B1)", group: "Foreign Exam" },
+  { value: "fce", label: "FCE (B2)", group: "Foreign Exam" },
+  { value: "ielts", label: "IELTS", group: "Foreign Exam" },
+  { value: "toefl", label: "TOEFL", group: "Foreign Exam" },
+  { value: "sat", label: "SAT", group: "Foreign Exam" },
+  // General
+  { value: "general_english", label: "General English", group: "General" },
+];
+
+const INITIAL_FORM = {
+  class_name: "",
+  class_code: "",
+  teacher_id: "",
+  level: "" as ClassLevel | "",
+  day_of_week: 1,
+  start_time: "08:00",
+  end_time: "09:30",
+  room_number: "",
+  building: "",
+  max_students: 15,
+  tuition_per_session: 150000,
+  currency: "VND",
+  semester: "",
+  start_date: "",
+  end_date: "",
+  total_sessions: 24,
+  sessions_per_month: 8,
+  curriculum: "",
+  textbook: "",
+  description: "",
+  status: "scheduled" as "scheduled" | "active",
+};
+
+export default function AddClassModal({ isOpen, onClose, onSuccess }: Props) {
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      teachersAPI.getAll({ is_active: true }).then((res) => setTeachers(res.items));
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const set = (key: string, value: any) => setForm((f) => ({ ...f, [key]: value }));
+
+  const handleSubmit = async () => {
+    setError("");
+    if (!form.class_name.trim()) return setError("Class name is required.");
+    if (!form.class_code.trim()) return setError("Class code is required.");
+    if (!form.teacher_id) return setError("Please assign a teacher.");
+    if (!form.level) return setError("Please select a level.");
+    if (!form.start_date) return setError("Start date is required.");
+    if (!form.end_date) return setError("End date is required.");
+
+    setLoading(true);
+    try {
+      await api.post("/classes/", {
+        ...form,
+        room_number: form.room_number || null,
+        building: form.building || null,
+        semester: form.semester || null,
+        curriculum: form.curriculum || null,
+        textbook: form.textbook || null,
+        description: form.description || null,
+        sessions_per_month: form.sessions_per_month || null,
+        assistant_teacher_id: null,
+      });
+      onSuccess();
+      onClose();
+      setForm(INITIAL_FORM);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "Failed to create class. Check details and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Group levels for rendering
+  const groups = ["School Reinforcement", "Foreign Exam", "General"];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Create New Class</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Set up schedule, level, and tuition details</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-5 max-h-[72vh] overflow-y-auto">
+          {error && (
+            <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+          )}
+
+          {/* Basic Info */}
+          <div>
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Basic Info</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Class Name <span className="text-red-500">*</span></label>
+                <Input value={form.class_name} onChange={(e) => set("class_name", e.target.value)} placeholder="e.g. IELTS Intermediate A" />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Class Code <span className="text-red-500">*</span></label>
+                <Input value={form.class_code} onChange={(e) => set("class_code", e.target.value.toUpperCase())} placeholder="e.g. IELTS-INT-A" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Teacher <span className="text-red-500">*</span></label>
+                <select
+                  value={form.teacher_id}
+                  onChange={(e) => set("teacher_id", e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  <option value="">Select a teacher...</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.full_name} ({t.role})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Level <span className="text-red-500">*</span></label>
+                <select
+                  value={form.level}
+                  onChange={(e) => set("level", e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  <option value="">Select a level...</option>
+                  {groups.map((group) => (
+                    <optgroup key={group} label={`── ${group} ──`}>
+                      {LEVEL_OPTIONS.filter((l) => l.group === group).map((l) => (
+                        <option key={l.value} value={l.value}>{l.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Schedule */}
+          <div>
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Schedule</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Day of Week</label>
+                <select
+                  value={form.day_of_week}
+                  onChange={(e) => set("day_of_week", Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  {DAYS_OF_WEEK.map((d, i) => (
+                    <option key={i} value={i}>{d}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => set("status", e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  <option value="scheduled">Scheduled</option>
+                  <option value="active">Active</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Start Time</label>
+                <Input type="time" value={form.start_time} onChange={(e) => set("start_time", e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">End Time</label>
+                <Input type="time" value={form.end_time} onChange={(e) => set("end_time", e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Start Date <span className="text-red-500">*</span></label>
+                <Input type="date" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">End Date <span className="text-red-500">*</span></label>
+                <Input type="date" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} />
+              </div>
+            </div>
+          </div>
+
+          {/* Capacity & Tuition */}
+          <div>
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Capacity & Tuition</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Max Students</label>
+                <Input type="number" min={1} max={50} value={form.max_students} onChange={(e) => set("max_students", Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Total Sessions</label>
+                <Input type="number" min={1} value={form.total_sessions} onChange={(e) => set("total_sessions", Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tuition / Session (VND)</label>
+                <Input type="number" min={0} step={10000} value={form.tuition_per_session} onChange={(e) => set("tuition_per_session", Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Sessions / Month</label>
+                <Input type="number" min={1} max={20} value={form.sessions_per_month} onChange={(e) => set("sessions_per_month", Number(e.target.value))} />
+              </div>
+            </div>
+          </div>
+
+          {/* Location */}
+          <div>
+            <h3 className="text-xs font-semibond text-slate-400 uppercase tracking-wider mb-3">Location (Optional)</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Room Number</label>
+                <Input value={form.room_number} onChange={(e) => set("room_number", e.target.value)} placeholder="e.g. 101" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Building</label>
+                <Input value={form.building} onChange={(e) => set("building", e.target.value)} placeholder="e.g. Building A" />
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label>
+            <textarea
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+              rows={2}
+              placeholder="Brief description of the class..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={loading} className="bg-amber-500 hover:bg-amber-600 text-white">
+            {loading ? "Creating..." : "Create Class"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

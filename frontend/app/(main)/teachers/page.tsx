@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import AddTeacherModal from "@/components/ui/AddTeacherModal";
 import { teachersAPI } from "@/lib/api";
 import type { Teacher } from "@/types";
 import { Mail, Phone, MessageCircle, Search, X } from "lucide-react";
@@ -14,11 +15,13 @@ export default function TeachersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const fetchTeachers = useCallback(async () => {
     setLoading(true);
     try {
       const response = await teachersAPI.getAll({ is_active: true });
+      // teachersAPI.getAll already remaps d.teachers → items
       setTeachers(response.items);
     } catch (error) {
       console.error("Failed to fetch teachers:", error);
@@ -31,7 +34,6 @@ export default function TeachersPage() {
     fetchTeachers();
   }, [fetchTeachers]);
 
-  // Client-side filtering (only 3-5 teachers, no need for server-side)
   const filtered = teachers.filter((t) => {
     const matchesSearch =
       !search ||
@@ -61,7 +63,10 @@ export default function TeachersPage() {
             Manage teaching staff and their information
           </p>
         </div>
-        <Button className="bg-amber-500 hover:bg-amber-600 text-white">
+        <Button
+          className="bg-amber-500 hover:bg-amber-600 text-white"
+          onClick={() => setShowAddModal(true)}
+        >
           + Add Teacher
         </Button>
       </div>
@@ -211,6 +216,13 @@ export default function TeachersPage() {
           Showing {filtered.length} of {teachers.length} teachers
         </div>
       </Card>
+
+      {/* Add Teacher Modal */}
+      <AddTeacherModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={fetchTeachers}
+      />
     </div>
   );
 }

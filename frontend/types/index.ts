@@ -105,6 +105,7 @@ export interface Class {
   assistant_teacher_id: string | null;
   assistant_teacher?: Teacher | null;
   day_of_week: number;
+  days_of_week: number[];
   start_time: string;
   end_time: string;
   room_number: string | null;         // actual DB column (not room)

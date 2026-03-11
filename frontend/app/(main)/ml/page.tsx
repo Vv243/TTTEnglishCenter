@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import api, { mlAPI } from "@/lib/api";
-import { AlertTriangle, Brain, TrendingUp, Users, CheckCircle, Calendar } from "lucide-react";
+import { AlertTriangle, Brain, TrendingUp, Users, CheckCircle, Calendar, Download, RefreshCw } from "lucide-react";
 
 interface Prediction {
   enrollment_id: string;
@@ -79,12 +79,45 @@ const getAttendanceTextColor = (rate: number) => {
   return "text-red-600";
 };
 
+function exportScheduleToCSV(schedule: ScheduleItem[], generatedAt: Date) {
+  const header = ["Class Name", "Level", "Teacher", "Day", "Start Time", "End Time", "Duration (min)", "Capacity"];
+  const rows = schedule.map((item) => [
+    item.class_name,
+    item.level.replace(/_/g, " ").toUpperCase(),
+    item.teacher_name,
+    item.day,
+    item.start_time,
+    item.end_time,
+    item.duration_minutes,
+    item.room_capacity,
+  ]);
+
+  const csvContent = [
+    `# TTT English Center — Generated Schedule`,
+    `# Generated: ${generatedAt.toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" })}`,
+    `# ${schedule.length} classes · No teacher conflicts`,
+    "",
+    header.join(","),
+    ...rows.map((r) => r.map((v) => `"${v}"`).join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `TTT_Schedule_${generatedAt.toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function MLInsightsPage() {
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "at-risk">("at-risk");
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
+  const [justRegenerated, setJustRegenerated] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -102,9 +135,14 @@ export default function MLInsightsPage() {
 
   const generateSchedule = async () => {
     setScheduleLoading(true);
+    setJustRegenerated(false);
     try {
-      const data = await mlAPI.getSchedule();
-      setSchedule(data);
+      const result = await mlAPI.getSchedule();
+      setSchedule(result);
+      setGeneratedAt(new Date());
+      setJustRegenerated(true);
+      // Clear the "just regenerated" flash after 2s
+      setTimeout(() => setJustRegenerated(false), 2000);
     } catch (e) {
       console.error(e);
     } finally {
@@ -238,7 +276,7 @@ export default function MLInsightsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {displayed.map((p, i) => (
+              {displayed.map((p) => (
                 <tr key={p.enrollment_id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -297,13 +335,55 @@ export default function MLInsightsPage() {
               <p className="text-sm text-slate-500">CSP solver with backtracking + DAG conflict detection</p>
             </div>
           </div>
-          <button
-            onClick={generateSchedule}
-            disabled={scheduleLoading}
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-300 disabled:cursor-not-allowed text-slate-900 font-semibold rounded-lg transition-colors text-sm"
-          >
-            {scheduleLoading ? "⏳ Generating..." : "⚡ Generate Schedule"}
-          </button>
+
+          <div className="flex items-center gap-2">
+            {/* Export button — only shown when schedule exists */}
+            {schedule && (
+              <button
+                onClick={() => exportScheduleToCSV(schedule.schedule, generatedAt!)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-medium rounded-lg transition-colors text-sm"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </button>
+            )}
+
+            {/* Generate / Re-run button */}
+            <button
+              onClick={generateSchedule}
+              disabled={scheduleLoading}
+              className={`flex items-center gap-2 px-4 py-2 font-semibold rounded-lg transition-all text-sm ${
+                justRegenerated
+                  ? "bg-green-500 text-white"
+                  : scheduleLoading
+                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  : schedule
+                  ? "bg-slate-800 hover:bg-slate-700 text-white"
+                  : "bg-amber-500 hover:bg-amber-400 text-slate-900"
+              }`}
+            >
+              {scheduleLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : justRegenerated ? (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  Schedule Updated!
+                </>
+              ) : schedule ? (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Re-run Schedule
+                </>
+              ) : (
+                <>
+                  ⚡ Generate Schedule
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {!schedule && !scheduleLoading && (
@@ -315,7 +395,7 @@ export default function MLInsightsPage() {
 
         {schedule && (
           <>
-            {/* Stats */}
+            {/* Stats + timestamp row */}
             <div className="grid grid-cols-4 gap-4 mb-4">
               {[
                 { label: "Total Classes", value: schedule.stats.total },
@@ -333,8 +413,31 @@ export default function MLInsightsPage() {
             {/* Timetable */}
             <Card className="overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-semibold text-slate-900">Generated Timetable</h3>
-                <span className="text-xs text-slate-400">{schedule.stats.scheduled} classes · no teacher conflicts</span>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Generated Timetable</h3>
+                  {generatedAt && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Last generated: {generatedAt.toLocaleString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-400">{schedule.stats.scheduled} classes · no teacher conflicts</span>
+                  {/* Inline export link for convenience */}
+                  <button
+                    onClick={() => exportScheduleToCSV(schedule.schedule, generatedAt!)}
+                    className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-medium"
+                  >
+                    <Download className="h-3 w-3" />
+                    Download CSV
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -346,23 +449,33 @@ export default function MLInsightsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {schedule.schedule.map((item) => (
-                      <tr key={item.class_id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${DAY_COLORS[item.day] ?? "bg-slate-100 text-slate-600"}`}>
-                            {item.day}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{item.start_time} – {item.end_time}</td>
-                        <td className="px-4 py-3 font-medium text-slate-900">{item.class_name}</td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-600 text-xs">{item.level}</span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{item.teacher_name}</td>
-                        <td className="px-4 py-3 text-slate-500">{item.duration_minutes}m</td>
-                        <td className="px-4 py-3 text-slate-500">{item.room_capacity}</td>
-                      </tr>
-                    ))}
+                    {schedule.schedule
+                      .slice()
+                      .sort((a, b) => {
+                        const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+                        const dayDiff = days.indexOf(a.day) - days.indexOf(b.day);
+                        if (dayDiff !== 0) return dayDiff;
+                        return a.start_time.localeCompare(b.start_time);
+                      })
+                      .map((item) => (
+                        <tr key={item.class_id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${DAY_COLORS[item.day] ?? "bg-slate-100 text-slate-600"}`}>
+                              {item.day}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-slate-600">{item.start_time} – {item.end_time}</td>
+                          <td className="px-4 py-3 font-medium text-slate-900">{item.class_name}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-600 text-xs">
+                              {item.level.replace(/_/g, " ").toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{item.teacher_name}</td>
+                          <td className="px-4 py-3 text-slate-500">{item.duration_minutes}m</td>
+                          <td className="px-4 py-3 text-slate-500">{item.room_capacity}</td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>

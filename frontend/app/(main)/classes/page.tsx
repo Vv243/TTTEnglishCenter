@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import EditClassModal from "@/components/ui/EditClassModal";
 import DeleteConfirmDialog from "@/components/ui/DeleteConfirmDialog";
+import AddClassModal from "@/components/ui/AddClassModal";
 import { classesAPI } from "@/lib/api";
-import type { Class, PaginatedResponse } from "@/types";
+import type { Class } from "@/types";
 import { ChevronLeft, ChevronRight, Clock, Calendar, Users, Search, X, Pencil, Trash2 } from "lucide-react";
 
 const DAYS_OF_WEEK = [
@@ -27,7 +28,7 @@ const DAY_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Statuses" },
-  { value: "active",    label: "Active" },
+  { value: "active", label: "Active" },
   { value: "scheduled", label: "Scheduled" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
@@ -36,28 +37,28 @@ const STATUS_OPTIONS = [
 const LEVEL_OPTIONS = [
   { value: "", label: "All Levels", disabled: false },
   { value: "", label: "── School Reinforcement ──", disabled: true },
-  { value: "primary_1",       label: "Primary 1",      disabled: false },
-  { value: "primary_2",       label: "Primary 2",      disabled: false },
-  { value: "primary_3",       label: "Primary 3",      disabled: false },
-  { value: "primary_4",       label: "Primary 4",      disabled: false },
-  { value: "primary_5",       label: "Primary 5",      disabled: false },
-  { value: "secondary_6",     label: "Secondary 6",    disabled: false },
-  { value: "secondary_7",     label: "Secondary 7",    disabled: false },
-  { value: "secondary_8",     label: "Secondary 8",    disabled: false },
-  { value: "secondary_9",     label: "Secondary 9",    disabled: false },
-  { value: "high_10",         label: "High 10",        disabled: false },
-  { value: "high_11",         label: "High 11",        disabled: false },
-  { value: "high_12",         label: "High 12",        disabled: false },
+  { value: "primary_1", label: "Primary 1", disabled: false },
+  { value: "primary_2", label: "Primary 2", disabled: false },
+  { value: "primary_3", label: "Primary 3", disabled: false },
+  { value: "primary_4", label: "Primary 4", disabled: false },
+  { value: "primary_5", label: "Primary 5", disabled: false },
+  { value: "secondary_6", label: "Secondary 6", disabled: false },
+  { value: "secondary_7", label: "Secondary 7", disabled: false },
+  { value: "secondary_8", label: "Secondary 8", disabled: false },
+  { value: "secondary_9", label: "Secondary 9", disabled: false },
+  { value: "high_10", label: "High 10", disabled: false },
+  { value: "high_11", label: "High 11", disabled: false },
+  { value: "high_12", label: "High 12", disabled: false },
   { value: "", label: "── Foreign Exam ──", disabled: true },
-  { value: "starters",        label: "Starters",       disabled: false },
-  { value: "movers",          label: "Movers",         disabled: false },
-  { value: "flyers",          label: "Flyers",         disabled: false },
-  { value: "ket",             label: "KET (A2)",       disabled: false },
-  { value: "pet",             label: "PET (B1)",       disabled: false },
-  { value: "fce",             label: "FCE (B2)",       disabled: false },
-  { value: "ielts",           label: "IELTS",          disabled: false },
-  { value: "toefl",           label: "TOEFL",          disabled: false },
-  { value: "sat",             label: "SAT",            disabled: false },
+  { value: "starters", label: "Starters", disabled: false },
+  { value: "movers", label: "Movers", disabled: false },
+  { value: "flyers", label: "Flyers", disabled: false },
+  { value: "ket", label: "KET (A2)", disabled: false },
+  { value: "pet", label: "PET (B1)", disabled: false },
+  { value: "fce", label: "FCE (B2)", disabled: false },
+  { value: "ielts", label: "IELTS", disabled: false },
+  { value: "toefl", label: "TOEFL", disabled: false },
+  { value: "sat", label: "SAT", disabled: false },
   { value: "", label: "── General ──", disabled: true },
   { value: "general_english", label: "General English", disabled: false },
 ];
@@ -86,13 +87,16 @@ interface Filters {
 const INITIAL_FILTERS: Filters = { search: "", status: "", level: "", day_of_week: "" };
 
 export default function ClassesPage() {
-  const [data, setData] = useState<PaginatedResponse<Class> | null>(null);
+  const [allClasses, setAllClasses] = useState<Class[]>([]);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [searchInput, setSearchInput] = useState("");
 
   // Modal state
+  const [showAddModal, setShowAddModal] = useState(false);
   const [editClass, setEditClass] = useState<Class | null>(null);
   const [deleteClass, setDeleteClass] = useState<Class | null>(null);
 
@@ -113,8 +117,16 @@ export default function ClassesPage() {
       if (filters.status)      params.status      = filters.status;
       if (filters.level)       params.level       = filters.level;
       if (filters.day_of_week) params.day_of_week = Number(filters.day_of_week);
+
       const result = await classesAPI.getAll(params);
-      setData(result);
+      const raw: Class[] = result.classes ?? [];
+
+      // Hide cancelled classes unless specifically filtered for
+      const visible = filters.status ? raw : raw.filter((c) => c.status !== "cancelled");
+
+      setAllClasses(visible);
+      setTotal(visible.length);
+      setPages(result.pages ?? 1);
     } catch (error) {
       console.error("Failed to fetch classes:", error);
     } finally {
@@ -124,7 +136,8 @@ export default function ClassesPage() {
 
   useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
-  const classes = (data?.items || []).filter((c) => {
+  // Client-side search filter
+  const classes = allClasses.filter((c) => {
     if (!filters.search) return true;
     const q = filters.search.toLowerCase();
     return c.class_name.toLowerCase().includes(q) || c.class_code.toLowerCase().includes(q);
@@ -152,10 +165,15 @@ export default function ClassesPage() {
         <div>
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Classes</h1>
           <p className="text-slate-600">
-            {data ? `${data.total} classes total` : "Manage class schedules and enrollments"}
+            {loading ? "Manage class schedules and enrollments" : `${total} classes total`}
           </p>
         </div>
-        <Button className="bg-amber-500 hover:bg-amber-600 text-white">+ Create Class</Button>
+        <Button
+          className="bg-amber-500 hover:bg-amber-600 text-white"
+          onClick={() => setShowAddModal(true)}
+        >
+          + Create Class
+        </Button>
       </div>
 
       {/* Filters */}
@@ -202,7 +220,7 @@ export default function ClassesPage() {
         {hasActiveFilters && (
           <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100">
             <span className="text-xs text-slate-500">Filters:</span>
-            {filters.search && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">Search: "{filters.search}"</span>}
+            {filters.search && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">Search: &quot;{filters.search}&quot;</span>}
             {filters.status && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">Status: {filters.status}</span>}
             {filters.level && <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">Level: {formatLevel(filters.level)}</span>}
             {filters.day_of_week && <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Day: {DAYS_OF_WEEK[Number(filters.day_of_week)]}</span>}
@@ -229,15 +247,14 @@ export default function ClassesPage() {
               className="p-6 hover:shadow-lg transition-all animate-fade-in"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              {/* Card header — name + status + action buttons */}
+              {/* Card header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1 min-w-0 mr-3">
                   <h3 className="text-xl font-bold text-slate-900 mb-1 truncate">{classItem.class_name}</h3>
                   <p className="text-sm font-mono text-slate-500">{classItem.class_code}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <Badge variant={getStatusColor(classItem.status)}>{classItem.status.toUpperCase()}</Badge>
-                  {/* Edit button */}
+                  <Badge variant={getStatusColor(classItem.status) as any}>{classItem.status.toUpperCase()}</Badge>
                   <button
                     onClick={() => setEditClass(classItem)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
@@ -245,7 +262,6 @@ export default function ClassesPage() {
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
-                  {/* Delete button */}
                   <button
                     onClick={() => setDeleteClass(classItem)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
@@ -265,7 +281,11 @@ export default function ClassesPage() {
               <div className="space-y-2 mb-4">
                 <div className="flex items-center gap-3 text-sm text-slate-600">
                   <Calendar className="h-4 w-4" />
-                  <span className="font-medium">{DAYS_OF_WEEK[classItem.day_of_week] ?? "TBD"}</span>
+                  <span className="font-medium">
+                    {(classItem.days_of_week?.length > 0
+                      ? classItem.days_of_week.map((d: number) => DAYS_OF_WEEK[d]).join(" / ")
+                      : DAYS_OF_WEEK[classItem.day_of_week]) ?? "TBD"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-slate-600">
                   <Clock className="h-4 w-4" />
@@ -289,6 +309,15 @@ export default function ClassesPage() {
                   />
                 </div>
                 <p className="text-xs text-slate-400 mt-1">{classItem.max_students - classItem.current_enrollment} spots remaining</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {classItem.start_date
+                    ? new Date(classItem.start_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                    : "—"}
+                  {" → "}
+                  {classItem.end_date
+                    ? new Date(classItem.end_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                    : "—"}
+                </p>
               </div>
 
               {/* Footer */}
@@ -308,18 +337,18 @@ export default function ClassesPage() {
       )}
 
       {/* Pagination */}
-      {data && data.pages > 1 && (
+      {pages > 1 && (
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-600">
-              Showing {(page - 1) * perPage + 1} to {Math.min(page * perPage, data.total)} of {data.total} classes
+              Showing {(page - 1) * perPage + 1} to {Math.min(page * perPage, total)} of {total} classes
             </p>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
                 <ChevronLeft className="h-4 w-4" /> Previous
               </Button>
-              <span className="text-sm font-mono text-slate-600">Page {page} of {data.pages}</span>
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(data.pages, p + 1))} disabled={page === data.pages}>
+              <span className="text-sm font-mono text-slate-600">Page {page} of {pages}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page === pages}>
                 Next <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -328,6 +357,12 @@ export default function ClassesPage() {
       )}
 
       {/* Modals */}
+      <AddClassModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={fetchClasses}
+      />
+
       <EditClassModal
         classItem={editClass}
         isOpen={!!editClass}
