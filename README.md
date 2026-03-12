@@ -5,7 +5,7 @@
 **Live Frontend:** http://localhost:3000  
 **Live API:** http://localhost:8000/docs  
 **Database:** PostgreSQL on port 5433  
-**Status:** 🔄 Day 10 In Progress (95%)
+**Status:** ✅ Day 11 Complete (98%)
 
 ---
 
@@ -52,13 +52,15 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 - Students: `is_active = false` | Classes: `status = 'cancelled'` — never hard delete
 - All write endpoints protected by JWT
 
-### 🔄 Payment Tracker (Day 10 — In Progress)
-- **Class-first monthly view:** each class card shows paid/overdue/due counts
+### ✅ Payment Tracker (Day 11 — Complete)
+- **Class-first monthly view:** each class card shows paid/overdue/due counts + revenue collected
+- **Month navigation:** `‹ March 2026 ›` arrows, "Back to current month" shortcut
+- **Search bar:** filter classes by name, teacher, or level in real time
 - **Expand class** → see each enrolled student's payment status for that month
-- **Actions:** Mark Paid (cash/bank transfer), Postpone (requires reason + new date), Waive (requires reason)
-- **Student history modal:** full payment timeline per student
-- **Receipt printing:** bilingual Vietnamese receipt via `window.print()`
-- **Enrollment auto-confirm:** first payment flips enrollment to Active
+- **Actions:** Mark Paid (cash/bank transfer), Postpone (requires reason + new due date), Mark Missed
+- **Student history modal:** full payment timeline per student with collection rate summary
+- **Receipt printing:** bilingual Vietnamese PHIẾU THU receipt via `window.print()`
+- **Enrollment auto-confirm:** first payment flips enrollment status from Scheduled → Active
 
 ---
 
@@ -86,9 +88,10 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 | 7 | Address system upgrade + Payment forecasting | ✅ Done |
 | 8 | JWT authentication + CSP scheduling | ✅ Done |
 | 9 | Edit/Delete forms + type fixes | ✅ Done |
-| 10 | Payment Tracker + Polish | 🔄 In Progress |
-| 11 | Pre-deployment polish + bug fixes | 📅 Upcoming |
-| 12 | Deployment (Vercel + Railway + Neon) | 📅 Upcoming |
+| 10 | Polish + bug fixes (enrollment names, cancelled class filter, delete working) | ✅ Done |
+| 11 | Payment Tracker (backend + frontend) | ✅ Done |
+| 12 | Pre-deployment polish | 📅 Upcoming |
+| 13 | Deployment (Vercel + Railway + Neon) | 📅 Upcoming |
 
 ---
 
@@ -103,7 +106,7 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 | Classes | `/classes` | ✅ Working (multi-day toggles, start/end dates, edit/delete) |
 | Enrollments | `/enrollments` | ✅ Working (active+scheduled classes, 3 status options) |
 | ML Insights | `/ml` | ✅ Working (Random Forest + CSP scheduler) |
-| Payments | `/payments` | 🔄 Day 10 — adding Monthly Tracker tab |
+| Payments | `/payments` | ✅ Working (Monthly Tracker + Revenue Forecast + Payment Risk) |
 
 ---
 
@@ -118,15 +121,21 @@ Building a comprehensive management system for Vietnamese English tutoring cente
 |--------|-----------|--------|
 | Mark Paid | Đã thanh toán | Records payment, flips enrollment to Active |
 | Postpone | Hoãn thanh toán | Records late + new due date, requires reason |
-| Waive | Miễn học phí | Records as paid at 0₫, requires reason |
+| Mark Missed | Không thanh toán | Records missed payment |
 
 ### Monthly Tracker Flow
 1. Open **Payments → Monthly Tracker**
-2. See all active/scheduled classes for selected month
-3. Classes sorted: overdue → due → all paid
-4. Expand class → see each student's status
-5. One-click Mark Paid for normal payments
-6. Postpone/Waive open a reason form
+2. Navigate months with `‹ ›` arrows
+3. See all active/scheduled classes — search by name, teacher, or level
+4. Expand class → see each student's payment status
+5. Click **Record** → choose Paid/Postpone/Missed + payment method + optional note
+6. Paid students show **🖨 Receipt** button → prints bilingual PHIẾU THU
+7. Click any student name → view full payment history modal
+
+### Payment History
+- Per-student timeline showing month, class, amount, status, method
+- Collection rate summary (Total Paid / Total Missed / %)
+- Older seed records (pre-Day 11) show `—` for class/method — expected behavior
 
 ---
 
@@ -159,11 +168,11 @@ EduCore accepts both old-style ("Quận 1") and new-style ("Phường Bến Ngh�
 
 ## 🗄️ Database
 
-**Data:** 3 teachers, 21 students, 6 classes, 31 enrollments, 126 payment history records, 4 users
+**Data:** 3 teachers, 20 students, 5 active classes (1 cancelled), ~22 enrollments, 126+ payment history records, 4 users
 
 **Tables:**
 - `teachers`, `students`, `classes`, `enrollments` — core data
-- `payment_history` — payment records with method, note, recorded_by, enrollment_id
+- `payment_history` — payment records with `enrollment_id`, `payment_method`, `note`, `recorded_by` (added Day 11)
 - `users` — admin/teacher accounts with bcrypt hashed passwords
 
 **Rules:**
@@ -219,6 +228,9 @@ Navigate to http://localhost:3000 — you'll be redirected to `/login`. Use `adm
 | EditClassModal single day only | Replaced with 7 toggle buttons |
 | Enrollment picker requires typing | Changed to always show classes on open |
 | Scheduled classes missing from enrollment | Filter changed to active OR scheduled |
+| Class edit 500 (unique constraint) | Dropped idx_teacher_schedule_unique, idx_room_schedule_unique, idx_classes_schedule |
+| Payment history class_.name error | Class model uses class_name not name |
+| ClassModel.name error in payments | Class model uses class_name not name |
 
 ---
 
@@ -229,4 +241,4 @@ Building for family's tutoring center in Sài Gòn.
 Mom teaches in Sài Gòn · Aunts from Châu Đốc, An Giang.
 
 **Built with ❤️ for Vietnamese English teachers**  
-*Last Updated: March 9, 2026 — Day 10 In Progress (95%)*
+*Last Updated: March 12, 2026 — Day 11 Complete (98%)*
