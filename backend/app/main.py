@@ -8,6 +8,7 @@ from app.api import api_router
 from app.database import engine
 from app.api.ml import router as ml_router
 from app.models import payment_history
+from app.api.payments import router as payments_router
 load_dotenv()
 
 from app.api.auth import router as auth_router
@@ -46,6 +47,8 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 
+app.include_router(payments_router, prefix="/api/v1")
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
@@ -63,4 +66,6 @@ async def root():
         "redoc": "/redoc",
         "health": "/health"
     }
+
+
 
