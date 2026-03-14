@@ -8,6 +8,7 @@ from app.api import api_router
 from app.database import engine
 from app.api.ml import router as ml_router
 from app.models import payment_history
+from app.models import attendance
 from app.api.payments import router as payments_router
 load_dotenv()
 

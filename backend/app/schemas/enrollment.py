@@ -12,7 +12,7 @@ class EnrollmentBase(BaseModel):
 
     # Enrollment details
     enrollment_date: date = Field(default_factory=date.today)
-    status: str = Field(default='active', pattern='^(active|dropped|completed|suspended|waitlisted|scheduled)$')
+    status: str = Field(default='pending', pattern='^(pending|enrolled|waitlisted|withdrawn)$')
 
     # Waitlist
     waitlist_position: Optional[int] = Field(None, gt=0)

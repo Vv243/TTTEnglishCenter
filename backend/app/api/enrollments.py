@@ -79,27 +79,49 @@ async def create_enrollment(
     if not class_obj:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    if class_obj.current_enrollment >= class_obj.max_students:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Class is full ({class_obj.current_enrollment}/{class_obj.max_students})"
-        )
+    class_is_full = class_obj.current_enrollment >= class_obj.max_students
 
     result = await db.execute(
         select(EnrollmentModel).where(
             EnrollmentModel.student_id == enrollment_data.student_id,
             EnrollmentModel.class_id == enrollment_data.class_id,
-            EnrollmentModel.status == 'active'
+            EnrollmentModel.status.in_(['enrolled', 'pending'])
         )
     )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Student already enrolled in this class")
 
-    enrollment = EnrollmentModel(**enrollment_data.model_dump())
-    class_obj.current_enrollment += 1
+    enrollment_dict = enrollment_data.model_dump()
+
+    if class_is_full:
+        # Count current waitlist to assign position
+        waitlist_count_result = await db.execute(
+            select(func.count()).where(
+                EnrollmentModel.class_id == enrollment_data.class_id,
+                EnrollmentModel.status == 'waitlisted'
+            )
+        )
+        waitlist_count = waitlist_count_result.scalar() or 0
+        enrollment_dict['status'] = 'waitlisted'
+        enrollment_dict['waitlist_position'] = waitlist_count + 1
+        from datetime import datetime, timezone
+        enrollment_dict['waitlist_date'] = datetime.now(timezone.utc)
+    else:
+        enrollment_dict['status'] = 'pending'
+
+    enrollment = EnrollmentModel(**enrollment_dict)
+    if not class_is_full:
+        class_obj.current_enrollment += 1
     db.add(enrollment)
     await db.commit()
-    await db.refresh(enrollment)
+
+    # Reload with relationships for response serialization
+    reload_result = await db.execute(
+        select(EnrollmentModel)
+        .options(joinedload(EnrollmentModel.student), joinedload(EnrollmentModel.class_))
+        .where(EnrollmentModel.id == enrollment.id)
+    )
+    enrollment = reload_result.scalar_one()
     return enrollment
 
 @router.patch("/{enrollment_id}", response_model=Enrollment)
@@ -118,7 +140,7 @@ async def update_enrollment(
 
     update_data = enrollment_data.model_dump(exclude_unset=True)
 
-    if 'status' in update_data and update_data['status'] == 'dropped':
+    if 'status' in update_data and update_data['status'] == 'withdrawn':
         if not enrollment.drop_date:
             enrollment.drop_date = date.today()
         result = await db.execute(
@@ -132,7 +154,14 @@ async def update_enrollment(
         setattr(enrollment, field, value)
 
     await db.commit()
-    await db.refresh(enrollment)
+
+    # Reload with relationships for response serialization
+    reload_result = await db.execute(
+        select(EnrollmentModel)
+        .options(joinedload(EnrollmentModel.student), joinedload(EnrollmentModel.class_))
+        .where(EnrollmentModel.id == enrollment_id)
+    )
+    enrollment = reload_result.scalar_one()
     return enrollment
 
 @router.delete("/{enrollment_id}", status_code=204)
@@ -149,7 +178,7 @@ async def delete_enrollment(
         raise HTTPException(status_code=404, detail="Enrollment not found")
 
     # Soft delete — set status to dropped instead of hard deleting
-    if enrollment.status == 'active':
+    if enrollment.status in ('enrolled', 'pending'):
         result = await db.execute(
             select(ClassModel).where(ClassModel.id == enrollment.class_id)
         )
@@ -157,7 +186,7 @@ async def delete_enrollment(
         if class_obj and class_obj.current_enrollment > 0:
             class_obj.current_enrollment -= 1
 
-    enrollment.status = 'dropped'
+    enrollment.status = 'withdrawn'
     if not enrollment.drop_date:
         enrollment.drop_date = date.today()
     await db.commit()

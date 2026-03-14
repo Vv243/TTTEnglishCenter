@@ -6,6 +6,8 @@ from uuid import UUID
 
 from app.database import get_db
 from app.models.student import Student as StudentModel
+from app.models.enrollment import Enrollment as EnrollmentModel
+from app.models.class_model import Class as ClassModel
 from app.schemas.student import Student, StudentCreate, StudentUpdate, StudentList
 from app.core.auth import get_current_user
 from app.models.user import User
@@ -120,7 +122,28 @@ async def delete_student(
     student = result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
-    
+
+    # Auto-withdraw all active/pending enrollments before deactivating
+    from datetime import date
+    enrollments_result = await db.execute(
+        select(EnrollmentModel).where(
+            EnrollmentModel.student_id == student_id,
+            EnrollmentModel.status.in_(['enrolled', 'pending'])
+        )
+    )
+    active_enrollments = enrollments_result.scalars().all()
+
+    for enrollment in active_enrollments:
+        class_result = await db.execute(
+            select(ClassModel).where(ClassModel.id == enrollment.class_id)
+        )
+        class_obj = class_result.scalar_one_or_none()
+        if class_obj and class_obj.current_enrollment > 0:
+            class_obj.current_enrollment -= 1
+        enrollment.status = 'withdrawn'
+        enrollment.drop_date = date.today()
+        enrollment.drop_reason = 'Student deactivated'
+
     student.is_active = False
     await db.commit()
     return None

@@ -132,11 +132,10 @@ export interface Class {
 
 // Enrollment types
 export type EnrollmentStatus =
-  | "active"
-  | "dropped"
-  | "completed"
-  | "suspended"
-  | "waitlisted";
+  | "pending"
+  | "enrolled"
+  | "waitlisted"
+  | "withdrawn";
 
 export interface Enrollment {
   id: string;

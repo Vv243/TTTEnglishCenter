@@ -84,7 +84,7 @@ async def get_monthly_tracker(
             joinedload(Enrollment.student),
             joinedload(Enrollment.class_),
         )
-        .where(Enrollment.status.in_(["active", "scheduled"]))
+        .where(Enrollment.status.in_(["enrolled", "pending"]))
     )
     enrollments = enrollments_result.scalars().unique().all()
 
@@ -348,8 +348,12 @@ async def record_payment(
         db.add(payment_record)
 
     # Auto-flip enrollment to active on first payment
-    if payload.action == "paid" and enrollment and enrollment.status == "scheduled":
-        enrollment.status = "active"
+    if payload.action == "paid" and enrollment and enrollment.status == "pending":
+        # Only flip to enrolled if the class is currently active
+        class_result = await db.execute(select(ClassModel).where(ClassModel.id == enrollment.class_id))
+        enr_class = class_result.scalar_one_or_none()
+        if enr_class and enr_class.status == "active":
+            enrollment.status = "enrolled"
 
     await db.commit()
     await db.refresh(payment_record)

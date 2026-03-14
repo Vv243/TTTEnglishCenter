@@ -45,7 +45,7 @@ async def get_summary(db: AsyncSession = Depends(get_db)) -> Dict[str, int]:
     result = await db.execute(
         select(func.count())
         .select_from(EnrollmentModel)
-        .where(EnrollmentModel.status == "active")
+        .where(EnrollmentModel.status == "enrolled")
     )
     enrollments = result.scalar() or 0
 

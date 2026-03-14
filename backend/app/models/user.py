@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Boolean, Enum as SAEnum
+from sqlalchemy import Column, String, Boolean, Enum as SAEnum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import Base
 import enum
@@ -18,3 +18,4 @@ class User(Base):
     role = Column(SAEnum(UserRole), nullable=False, default=UserRole.teacher)
     full_name = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    teacher_id = Column(UUID(as_uuid=True), ForeignKey('teachers.id'), nullable=True)

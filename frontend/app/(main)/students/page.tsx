@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { studentsAPI } from "@/lib/api";
 import type { Student, PaginatedResponse } from "@/types";
-import { ChevronLeft, ChevronRight, MapPin, Phone, Users, Search, X, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Phone, Users, Search, X, Pencil, Trash2, EyeOff } from "lucide-react";
 
 // ---------- Filter State ----------
 interface Filters {
@@ -90,6 +90,7 @@ export default function StudentsPage() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [searchInput, setSearchInput] = useState("");
+  const [showInactive, setShowInactive] = useState(false);
 
   // Modal state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -113,8 +114,10 @@ export default function StudentsPage() {
       const params: Record<string, unknown> = {
         page,
         page_size: perPage,
-        is_active: true,
       };
+
+      // Only filter by is_active when NOT showing inactive
+      if (!showInactive) params.is_active = true;
 
       if (filters.grade_level)     params.grade_level     = filters.grade_level;
       if (filters.payment_cluster) params.payment_cluster = filters.payment_cluster;
@@ -127,7 +130,7 @@ export default function StudentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters.grade_level, filters.payment_cluster, filters.province_city]);
+  }, [page, filters.grade_level, filters.payment_cluster, filters.province_city, showInactive]);
 
   useEffect(() => {
     fetchStudents();
@@ -163,6 +166,11 @@ export default function StudentsPage() {
     fetchStudents();
   };
 
+  const toggleInactive = () => {
+    setShowInactive((v) => !v);
+    setPage(1);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -170,16 +178,34 @@ export default function StudentsPage() {
         <div>
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Students</h1>
           <p className="text-slate-600">
-            {data ? `${data.total} students total` : "Manage student enrollments and information"}
+            {data ? `${data.total} ${showInactive ? "total" : "active"} students` : "Manage student enrollments and information"}
           </p>
         </div>
-        <Button
-          className="bg-amber-500 hover:bg-amber-600 text-white"
-          onClick={() => setShowAddModal(true)}
-        >
-          + Add Student
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={toggleInactive}
+            className={`gap-2 ${showInactive ? "border-amber-400 text-amber-700 bg-amber-50" : ""}`}
+          >
+            <EyeOff className="h-4 w-4" />
+            {showInactive ? "Hide Inactive" : "Show Inactive"}
+          </Button>
+          <Button
+            className="bg-amber-500 hover:bg-amber-600 text-white"
+            onClick={() => setShowAddModal(true)}
+          >
+            + Add Student
+          </Button>
+        </div>
       </div>
+
+      {/* Inactive banner */}
+      {showInactive && (
+        <div className="px-4 py-3 bg-slate-100 border border-slate-300 rounded-lg text-sm text-slate-600 flex items-center gap-2">
+          <EyeOff className="h-4 w-4 text-slate-400" />
+          Showing all students including inactive — inactive students are dimmed
+        </div>
+      )}
 
       {/* Search & Filters */}
       <Card className="p-4">
@@ -308,22 +334,25 @@ export default function StudentsPage() {
               <tbody className="divide-y divide-slate-100">
                 {students.map((student, index) => {
                   const address = formatAddress(student);
+                  const isInactive = !student.is_active;
                   return (
                     <tr
                       key={student.id}
-                      className="hover:bg-slate-50 transition-colors animate-fade-in"
+                      className={`transition-colors animate-fade-in ${isInactive ? "opacity-50 bg-slate-50" : "hover:bg-slate-50"}`}
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       {/* Student */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
+                          <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0 ${isInactive ? "bg-slate-400" : "bg-gradient-to-br from-green-400 to-green-600"}`}>
                             {student.full_name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="font-medium text-slate-900">{student.full_name}</p>
+                            <p className={`font-medium ${isInactive ? "text-slate-400 line-through" : "text-slate-900"}`}>
+                              {student.full_name}
+                            </p>
                             <p className="text-xs text-slate-500">
-                              Enrolled:{" "}
+                              {isInactive ? "Deactivated" : "Enrolled"}:{" "}
                               {new Date(student.enrollment_date).toLocaleDateString("en-US", {
                                 month: "short",
                                 year: "numeric",
@@ -390,20 +419,27 @@ export default function StudentsPage() {
                       {/* Actions */}
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => setEditStudent(student)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                            title="Edit student"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteStudent(student)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Deactivate student"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {student.is_active && (
+                            <>
+                              <button
+                                onClick={() => setEditStudent(student)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                title="Edit student"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteStudent(student)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                title="Deactivate student"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                          {!student.is_active && (
+                            <span className="text-xs text-slate-400 italic">Inactive</span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -467,7 +503,7 @@ export default function StudentsPage() {
         onClose={() => setDeleteStudent(null)}
         onConfirm={handleDelete}
         title={`Deactivate ${deleteStudent?.full_name ?? "student"}?`}
-        description={`This will mark ${deleteStudent?.full_name ?? "this student"} as inactive. Their enrollment records and payment history will be preserved.`}
+        description={`This will mark ${deleteStudent?.full_name ?? "this student"} as inactive and withdraw them from all active classes. Their payment history will be preserved.`}
         confirmLabel="Deactivate Student"
       />
     </div>
