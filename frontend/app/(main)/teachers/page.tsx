@@ -9,6 +9,7 @@ import AddTeacherModal from "@/components/ui/AddTeacherModal";
 import { teachersAPI } from "@/lib/api";
 import type { Teacher } from "@/types";
 import { Mail, Phone, MessageCircle, Search, X } from "lucide-react";
+import { authStorage } from "@/lib/auth";
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -16,6 +17,12 @@ export default function TeachersPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const user = authStorage.getUser();
+    setIsAdmin(user?.role === "admin");
+  }, []);
 
   const fetchTeachers = useCallback(async () => {
     setLoading(true);
@@ -63,12 +70,14 @@ export default function TeachersPage() {
             Manage teaching staff and their information
           </p>
         </div>
-        <Button
-          className="bg-amber-500 hover:bg-amber-600 text-white"
-          onClick={() => setShowAddModal(true)}
-        >
-          + Add Teacher
-        </Button>
+        {isAdmin && (
+          <Button
+            className="bg-amber-500 hover:bg-amber-600 text-white"
+            onClick={() => setShowAddModal(true)}
+          >
+            + Add Teacher
+          </Button>
+        )}
       </div>
 
       {/* Search & Filters */}

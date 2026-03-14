@@ -21,6 +21,7 @@ class UserOut(BaseModel):
     role: UserRole
     full_name: Optional[str]
     is_active: bool
+    teacher_id: Optional[uuid.UUID] = None
 
     class Config:
         from_attributes = True

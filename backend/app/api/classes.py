@@ -127,3 +127,141 @@ async def delete_class(
     class_obj.status = 'cancelled'
     await db.commit()
     return None
+
+from pydantic import BaseModel as _PydanticBase
+from typing import List as _List
+from datetime import time as _time
+
+class ConflictCheckRequest(_PydanticBase):
+    teacher_id: str
+    room_number: str
+    days_of_week: list
+    start_time: str  # "HH:MM"
+    end_time: str    # "HH:MM"
+    exclude_class_id: str | None = None  # for edits
+
+class ConflictResult(_PydanticBase):
+    has_conflict: bool
+    conflicts: list
+    warnings: list
+
+@router.post("/check-conflict/")
+async def check_conflict(
+    payload: ConflictCheckRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from sqlalchemy import select, and_, or_
+    from app.models.teacher import Teacher
+
+    # Parse times
+    def parse_time(t: str):
+        h, m = t.split(":")
+        return int(h) * 60 + int(m)
+
+    req_start = parse_time(payload.start_time)
+    req_end   = parse_time(payload.end_time)
+    req_days  = set(payload.days_of_week)
+
+    # Load all active/scheduled classes
+    q = select(ClassModel).where(ClassModel.status.in_(["active", "scheduled"]))
+    if payload.exclude_class_id:
+        from uuid import UUID
+        q = q.where(ClassModel.id != UUID(payload.exclude_class_id))
+    result = await db.execute(q)
+    classes = result.scalars().all()
+
+    conflicts = []
+    warnings  = []
+
+    for cls in classes:
+        cls_days  = set(cls.days_of_week or ([cls.day_of_week] if cls.day_of_week is not None else []))
+        overlap_days = req_days & cls_days
+        if not overlap_days:
+            continue
+
+        cls_start = parse_time(str(cls.start_time)[:5])
+        cls_end   = parse_time(str(cls.end_time)[:5])
+
+        # Check time overlap
+        time_overlap = req_start < cls_end and req_end > cls_start
+        time_adjacent = (
+            abs(req_start - cls_end) < 30 or
+            abs(req_end - cls_start) < 30
+        )
+
+        days_label = ", ".join(["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d] for d in sorted(overlap_days))
+
+        if time_overlap:
+            # Hard conflict — same room
+            if cls.room_number and cls.room_number == payload.room_number:
+                conflicts.append({
+                    "type": "room",
+                    "message": f"{cls.room_number} is already booked on {days_label} {str(cls.start_time)[:5]}–{str(cls.end_time)[:5]} by {cls.class_name}",
+                    "class_id": str(cls.id),
+                    "class_name": cls.class_name,
+                })
+            # Hard conflict — same teacher
+            if str(cls.teacher_id) == payload.teacher_id:
+                conflicts.append({
+                    "type": "teacher",
+                    "message": f"Teacher already has {cls.class_name} on {days_label} {str(cls.start_time)[:5]}–{str(cls.end_time)[:5]}",
+                    "class_id": str(cls.id),
+                    "class_name": cls.class_name,
+                })
+        elif time_adjacent:
+            if cls.room_number and cls.room_number == payload.room_number:
+                warnings.append({
+                    "type": "room_adjacent",
+                    "message": f"Less than 30 min gap with {cls.class_name} in {cls.room_number} on {days_label}",
+                    "class_id": str(cls.id),
+                    "class_name": cls.class_name,
+                })
+
+    return ConflictResult(
+        has_conflict=len(conflicts) > 0,
+        conflicts=conflicts,
+        warnings=warnings,
+    )
+
+
+@router.get("/schedule-grid/")
+async def get_schedule_grid(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Returns all active/scheduled classes formatted for the schedule grid"""
+    from sqlalchemy.orm import joinedload
+
+    result = await db.execute(
+        select(ClassModel)
+        .options(joinedload(ClassModel.teacher))
+        .where(ClassModel.status.in_(["active", "scheduled"]))
+    )
+    classes = result.scalars().unique().all()
+
+    grid = []
+    for cls in classes:
+        days = cls.days_of_week or ([cls.day_of_week] if cls.day_of_week is not None else [])
+        is_own = (
+            current_user.role == "admin" or
+            (hasattr(current_user, "teacher_id") and str(current_user.teacher_id) == str(cls.teacher_id))
+        )
+        grid.append({
+            "class_id": str(cls.id),
+            "class_name": cls.class_name,
+            "class_code": cls.class_code,
+            "teacher_id": str(cls.teacher_id),
+            "teacher_name": cls.teacher.full_name if cls.teacher else "Unknown",
+            "days_of_week": days,
+            "start_time": str(cls.start_time)[:5],
+            "end_time": str(cls.end_time)[:5],
+            "room_number": cls.room_number,
+            "level": cls.level,
+            "status": cls.status,
+            "is_own": is_own,
+            "current_enrollment": cls.current_enrollment,
+            "max_students": cls.max_students,
+        })
+
+    return grid

@@ -66,3 +66,23 @@ async def refresh_token(
         token_type="bearer",
         user=UserOut.model_validate(current_user)
     )
+
+from pydantic import BaseModel as _PydanticBase
+
+class ChangePasswordRequest(_PydanticBase):
+    current_password: str
+    new_password: str
+
+@router.post("/change-password/")
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    current_user.hashed_password = hash_password(payload.new_password)
+    await db.commit()
+    return {"message": "Password changed successfully"}

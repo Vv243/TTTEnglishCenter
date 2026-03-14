@@ -1,162 +1,311 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import EditClassModal from "@/components/ui/EditClassModal";
-import DeleteConfirmDialog from "@/components/ui/DeleteConfirmDialog";
-import AddClassModal from "@/components/ui/AddClassModal";
 import { classesAPI } from "@/lib/api";
+import api from "@/lib/api";
+import { authStorage } from "@/lib/auth";
 import type { Class } from "@/types";
-import { ChevronLeft, ChevronRight, Clock, Calendar, Users, Search, X, Pencil, Trash2 } from "lucide-react";
+import ScheduleGrid, { GridClass } from "@/components/ui/ScheduleGrid";
+import EditClassModal from "@/components/ui/EditClassModal";
+import AddClassModal from "@/components/ui/AddClassModal";
+import DeleteConfirmDialog from "@/components/ui/DeleteConfirmDialog";
+import {
+  Search, X, LayoutGrid, Calendar, ChevronDown, ChevronUp,
+  Users, Clock, BookOpen, AlertTriangle, CheckCircle
+} from "lucide-react";
 
-const DAYS_OF_WEEK = [
-  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
-];
-
-const DAY_OPTIONS = [
-  { value: "", label: "Any Day" },
-  { value: "1", label: "Monday" },
-  { value: "2", label: "Tuesday" },
-  { value: "3", label: "Wednesday" },
-  { value: "4", label: "Thursday" },
-  { value: "5", label: "Friday" },
-  { value: "6", label: "Saturday" },
-  { value: "0", label: "Sunday" },
-];
-
-const STATUS_OPTIONS = [
-  { value: "", label: "All Statuses" },
-  { value: "active", label: "Active" },
-  { value: "scheduled", label: "Scheduled" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-];
-
-const LEVEL_OPTIONS = [
-  { value: "", label: "All Levels", disabled: false },
-  { value: "", label: "── School Reinforcement ──", disabled: true },
-  { value: "primary_1", label: "Primary 1", disabled: false },
-  { value: "primary_2", label: "Primary 2", disabled: false },
-  { value: "primary_3", label: "Primary 3", disabled: false },
-  { value: "primary_4", label: "Primary 4", disabled: false },
-  { value: "primary_5", label: "Primary 5", disabled: false },
-  { value: "secondary_6", label: "Secondary 6", disabled: false },
-  { value: "secondary_7", label: "Secondary 7", disabled: false },
-  { value: "secondary_8", label: "Secondary 8", disabled: false },
-  { value: "secondary_9", label: "Secondary 9", disabled: false },
-  { value: "high_10", label: "High 10", disabled: false },
-  { value: "high_11", label: "High 11", disabled: false },
-  { value: "high_12", label: "High 12", disabled: false },
-  { value: "", label: "── Foreign Exam ──", disabled: true },
-  { value: "starters", label: "Starters", disabled: false },
-  { value: "movers", label: "Movers", disabled: false },
-  { value: "flyers", label: "Flyers", disabled: false },
-  { value: "ket", label: "KET (A2)", disabled: false },
-  { value: "pet", label: "PET (B1)", disabled: false },
-  { value: "fce", label: "FCE (B2)", disabled: false },
-  { value: "ielts", label: "IELTS", disabled: false },
-  { value: "toefl", label: "TOEFL", disabled: false },
-  { value: "sat", label: "SAT", disabled: false },
-  { value: "", label: "── General ──", disabled: true },
-  { value: "general_english", label: "General English", disabled: false },
-];
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "active":    return "success";
-    case "scheduled": return "default";
-    case "completed": return "outline";
-    case "cancelled": return "destructive";
-    default:          return "outline";
-  }
+// ── Helpers ───────────────────────────────────────────────────
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const LEVEL_COLORS: Record<string, string> = {
+  ielts: "bg-blue-100 text-blue-700",
+  toefl: "bg-purple-100 text-purple-700",
+  sat: "bg-red-100 text-red-700",
+  fce: "bg-green-100 text-green-700",
+  general_english: "bg-amber-100 text-amber-700",
+  default: "bg-slate-100 text-slate-700",
 };
 
-const formatLevel    = (level: string) => level.replace(/_/g, " ").toUpperCase();
-const formatTime     = (time: string)  => time ? time.slice(0, 5) : "--:--";
-const formatCurrency = (amount: number) => new Intl.NumberFormat("vi-VN").format(amount);
+const getLevelColor = (level: string) =>
+  LEVEL_COLORS[level] || LEVEL_COLORS.default;
 
-interface Filters {
-  search: string;
-  status: string;
-  level: string;
-  day_of_week: string;
-}
+const formatDays = (days: number[]) =>
+  days.map(d => DAY_NAMES[d]).join(", ");
 
-const INITIAL_FILTERS: Filters = { search: "", status: "", level: "", day_of_week: "" };
+const formatTime = (t: string) => t.slice(0, 5);
 
-export default function ClassesPage() {
-  const [allClasses, setAllClasses] = useState<Class[]>([]);
-  const [total, setTotal] = useState(0);
-  const [pages, setPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
-  const [searchInput, setSearchInput] = useState("");
-
-  // Modal state
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editClass, setEditClass] = useState<Class | null>(null);
-  const [deleteClass, setDeleteClass] = useState<Class | null>(null);
-
-  const perPage = 10;
+// ── Cancel Class Confirmation ─────────────────────────────────
+function CancelClassDialog({
+  cls,
+  onClose,
+  onConfirm,
+}: {
+  cls: Class;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [enrolledCount, setEnrolledCount] = useState<number | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setFilters((f) => ({ ...f, search: searchInput }));
-      setPage(1);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
+    api.get("/enrollments/", { params: { class_id: cls.id, status: "enrolled", page_size: 1 } })
+      .then(r => setEnrolledCount(r.data.total || 0))
+      .catch(() => setEnrolledCount(0));
+  }, [cls.id]);
+
+  const handleConfirm = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/classes/${cls.id}/`, { status: "cancelled" });
+      onConfirm();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || "Failed to cancel class.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-start gap-4 mb-4">
+          <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Cancel {cls.class_name}?</h3>
+            <p className="text-sm text-slate-500 mt-1">
+              This will mark the class as cancelled.
+              {enrolledCount !== null && enrolledCount > 0 && (
+                <span className="text-red-600 font-medium"> {enrolledCount} enrolled student{enrolledCount > 1 ? "s" : ""} will be withdrawn automatically.</span>
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+          Cancelled classes can be reactivated by an admin. All history is preserved.
+        </div>
+        {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Keep Class</Button>
+          <Button onClick={handleConfirm} disabled={saving} className="bg-red-600 hover:bg-red-700 text-white gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            {saving ? "Cancelling..." : "Cancel Class"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Class Card (Card View) ────────────────────────────────────
+function ClassCard({
+  cls,
+  isAdmin,
+  isOwnClass,
+  onEdit,
+  onCancel,
+  onDelete,
+}: {
+  cls: Class;
+  isAdmin: boolean;
+  isOwnClass: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const days = cls.days_of_week?.length > 0 ? formatDays(cls.days_of_week) : DAY_NAMES[cls.day_of_week] || "—";
+  const fillPct = Math.round((cls.current_enrollment / cls.max_students) * 100);
+  const isFull = cls.current_enrollment >= cls.max_students;
+  const canEdit = isAdmin || isOwnClass;
+  const canCancel = isAdmin || isOwnClass;
+
+  return (
+    <Card className={`overflow-hidden transition-all hover:shadow-md ${cls.status === "cancelled" ? "opacity-60" : ""}`}>
+      <div className="p-5">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-slate-900 text-lg truncate">{cls.class_name}</h3>
+              <Badge variant={cls.status === "active" ? "success" : cls.status === "scheduled" ? "warning" : "destructive"}>
+                {cls.status.toUpperCase()}
+              </Badge>
+            </div>
+            <p className="text-xs font-mono text-slate-400 mt-0.5">{cls.class_code}</p>
+          </div>
+          {canEdit && cls.status !== "cancelled" && (
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button onClick={onEdit} className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors" title="Edit">
+                ✏️
+              </button>
+              {canCancel && (
+                <button onClick={onCancel} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Cancel class">
+                  ❌
+                </button>
+              )}
+              {isAdmin && (
+                <button onClick={onDelete} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete permanently">
+                  🗑️
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Level badge */}
+        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold uppercase mb-3 ${getLevelColor(cls.level)}`}>
+          {cls.level.replace(/_/g, " ")}
+        </span>
+
+        {/* Schedule */}
+        <div className="space-y-1.5 text-sm text-slate-600 mb-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+            <span>{days}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 text-slate-400" />
+            <span>{formatTime(cls.start_time)} – {formatTime(cls.end_time)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Users className="h-3.5 w-3.5 text-slate-400" />
+            <span className={isFull ? "text-red-600 font-medium" : ""}>{cls.current_enrollment} / {cls.max_students} students</span>
+            {isFull && <span className="text-xs text-red-500 font-medium">FULL</span>}
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden mb-3">
+          <div
+            className={`h-full rounded-full transition-all ${fillPct >= 100 ? "bg-red-500" : fillPct >= 75 ? "bg-amber-500" : "bg-green-400"}`}
+            style={{ width: `${Math.min(fillPct, 100)}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>{cls.max_students - cls.current_enrollment} spots remaining</span>
+          {cls.room_number && <span>📍 {cls.room_number}</span>}
+        </div>
+
+        {/* Dates */}
+        {(cls.start_date || cls.end_date) && (
+          <p className="text-xs text-slate-400 mt-2">
+            {cls.start_date && new Date(cls.start_date).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })}
+            {cls.start_date && cls.end_date && " → "}
+            {cls.end_date && new Date(cls.end_date).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })}
+          </p>
+        )}
+
+        {/* Tuition */}
+        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-slate-400">Tuition per session</p>
+            <p className="font-bold font-mono text-slate-900">
+              {new Intl.NumberFormat("vi-VN").format(cls.tuition_per_session)} <span className="text-xs font-normal text-slate-400">VND</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────
+export default function ClassesPage() {
+  const [allClasses, setAllClasses] = useState<Class[]>([]);
+  const [gridClasses, setGridClasses] = useState<GridClass[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<"card" | "grid">("card");
+  const [showCancelled, setShowCancelled] = useState(false);
+  const [search, setSearch] = useState("");
+  const [levelFilter, setLevelFilter] = useState("");
+  const [dayFilter, setDayFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentTeacherId, setCurrentTeacherId] = useState<string | undefined>();
+  const [editClass, setEditClass] = useState<Class | null>(null);
+  const [cancelClass, setCancelClass] = useState<Class | null>(null);
+  const [deleteClass, setDeleteClass] = useState<Class | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [prefilledSlot, setPrefilledSlot] = useState<{ day: number; time: string } | null>(null);
+
+  useEffect(() => {
+    const user = authStorage.getUser();
+    setIsAdmin(user?.role === "admin");
+    if (user?.role !== "admin") {
+      // Get teacher_id for current user
+      api.get("/auth/me/").then(r => {
+        setCurrentTeacherId(r.data.teacher_id);
+      }).catch(() => {});
+    }
+  }, []);
 
   const fetchClasses = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { page, page_size: perPage };
-      if (filters.status)      params.status      = filters.status;
-      if (filters.level)       params.level       = filters.level;
-      if (filters.day_of_week) params.day_of_week = Number(filters.day_of_week);
-
-      const result = await classesAPI.getAll(params);
-      const raw: Class[] = result.classes ?? [];
-
-      // Hide cancelled classes unless specifically filtered for
-      const visible = filters.status ? raw : raw.filter((c) => c.status !== "cancelled");
-
-      setAllClasses(visible);
-      setTotal(visible.length);
-      setPages(result.pages ?? 1);
-    } catch (error) {
-      console.error("Failed to fetch classes:", error);
+      const [cardsResult, gridResult] = await Promise.all([
+        classesAPI.getAll({ per_page: 100 } as any),
+        api.get("/classes/schedule-grid/").then(r => r.data),
+      ]);
+      setAllClasses(cardsResult.items);
+      setGridClasses(gridResult);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [page, filters.status, filters.level, filters.day_of_week]);
+  }, []);
 
   useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
-  // Client-side search filter
-  const classes = allClasses.filter((c) => {
-    if (!filters.search) return true;
-    const q = filters.search.toLowerCase();
-    return c.class_name.toLowerCase().includes(q) || c.class_code.toLowerCase().includes(q);
-  });
-
-  const hasActiveFilters = filters.search || filters.status || filters.level || filters.day_of_week;
-
-  const clearFilters = () => { setFilters(INITIAL_FILTERS); setSearchInput(""); setPage(1); };
-
-  const handleFilterChange = (key: keyof Omit<Filters, "search">, value: string) => {
-    setFilters((f) => ({ ...f, [key]: value }));
-    setPage(1);
-  };
-
-  const handleDelete = async () => {
+  const handleDeleteClass = async () => {
     if (!deleteClass) return;
-    await classesAPI.delete(deleteClass.id);
+    await api.delete(`/classes/${deleteClass.id}/`);
     fetchClasses();
   };
+
+  const isOwnClass = (cls: Class) => {
+    if (isAdmin) return true;
+    return currentTeacherId && cls.teacher_id === currentTeacherId;
+  };
+
+  // Filter classes for card view
+  const filtered = allClasses.filter(cls => {
+    if (!showCancelled && cls.status === "cancelled") return false;
+    if (statusFilter && cls.status !== statusFilter) return false;
+    if (levelFilter && cls.level !== levelFilter) return false;
+    if (dayFilter) {
+      const days = cls.days_of_week || [cls.day_of_week];
+      if (!days.includes(parseInt(dayFilter))) return false;
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      if (!cls.class_name.toLowerCase().includes(q) && !cls.class_code.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const handleSlotClick = (day: number, time: string) => {
+    // Convert grid day (0=Mon) to stored day (1=Mon, 0=Sun)
+    const storedDay = day === 6 ? 0 : day + 1;
+    setPrefilledSlot({ day: storedDay, time });
+    setShowAddModal(true);
+  };
+
+  const handleGridClassClick = (cls: GridClass) => {
+    const fullClass = allClasses.find(c => c.id === cls.class_id);
+    if (fullClass && (isAdmin || cls.is_own)) {
+      setEditClass(fullClass);
+    }
+  };
+
+  const levels = [...new Set(allClasses.map(c => c.level))].sort();
 
   return (
     <div className="space-y-6">
@@ -164,220 +313,172 @@ export default function ClassesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Classes</h1>
-          <p className="text-slate-600">
-            {loading ? "Manage class schedules and enrollments" : `${total} classes total`}
-          </p>
+          <p className="text-slate-600">{allClasses.filter(c => c.status !== "cancelled").length} classes total</p>
         </div>
-        <Button
-          className="bg-amber-500 hover:bg-amber-600 text-white"
-          onClick={() => setShowAddModal(true)}
-        >
-          + Create Class
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* View toggle */}
+          <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setView("card")}
+              className={`px-3 py-2 text-sm flex items-center gap-1.5 transition-colors ${view === "card" ? "bg-amber-500 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              <LayoutGrid className="h-4 w-4" /> Cards
+            </button>
+            <button
+              onClick={() => setView("grid")}
+              className={`px-3 py-2 text-sm flex items-center gap-1.5 transition-colors ${view === "grid" ? "bg-amber-500 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              <Calendar className="h-4 w-4" /> Schedule
+            </button>
+          </div>
+          <Button className="bg-amber-500 hover:bg-amber-600 text-white" onClick={() => { setPrefilledSlot(null); setShowAddModal(true); }}>
+            + Create Class
+          </Button>
+        </div>
       </div>
 
-      {/* Filters */}
-      <Card className="p-4">
-        <div className="flex flex-wrap gap-3 items-center">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by class name or code..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
-            />
-            {searchInput && (
-              <button onClick={() => setSearchInput("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-
-          <select value={filters.status} onChange={(e) => handleFilterChange("status", e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white text-slate-700">
-            {STATUS_OPTIONS.map((s) => <option key={s.value + s.label} value={s.value}>{s.label}</option>)}
-          </select>
-
-          <select value={filters.level} onChange={(e) => handleFilterChange("level", e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white text-slate-700">
-            {LEVEL_OPTIONS.map((l) => <option key={l.value + l.label} value={l.value} disabled={l.disabled}>{l.label}</option>)}
-          </select>
-
-          <select value={filters.day_of_week} onChange={(e) => handleFilterChange("day_of_week", e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white text-slate-700">
-            {DAY_OPTIONS.map((d) => <option key={d.value + d.label} value={d.value}>{d.label}</option>)}
-          </select>
-
-          {hasActiveFilters && (
-            <Button variant="outline" size="sm" onClick={clearFilters} className="gap-1">
-              <X className="h-3 w-3" /> Clear
-            </Button>
-          )}
-        </div>
-
-        {hasActiveFilters && (
-          <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100">
-            <span className="text-xs text-slate-500">Filters:</span>
-            {filters.search && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">Search: &quot;{filters.search}&quot;</span>}
-            {filters.status && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">Status: {filters.status}</span>}
-            {filters.level && <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">Level: {formatLevel(filters.level)}</span>}
-            {filters.day_of_week && <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Day: {DAYS_OF_WEEK[Number(filters.day_of_week)]}</span>}
-          </div>
-        )}
-      </Card>
-
-      {/* Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center h-48">
-          <div className="animate-pulse text-slate-500">Loading classes...</div>
-        </div>
-      ) : classes.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center h-48 text-slate-400">
-          <Search className="h-8 w-8 mb-2 opacity-40" />
-          <p className="text-sm">No classes match your filters</p>
-          {hasActiveFilters && <button onClick={clearFilters} className="mt-2 text-xs text-amber-600 hover:underline">Clear filters</button>}
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {classes.map((classItem, index) => (
-            <Card
-              key={classItem.id}
-              className="p-6 hover:shadow-lg transition-all animate-fade-in"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              {/* Card header */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1 min-w-0 mr-3">
-                  <h3 className="text-xl font-bold text-slate-900 mb-1 truncate">{classItem.class_name}</h3>
-                  <p className="text-sm font-mono text-slate-500">{classItem.class_code}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Badge variant={getStatusColor(classItem.status) as any}>{classItem.status.toUpperCase()}</Badge>
-                  <button
-                    onClick={() => setEditClass(classItem)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                    title="Edit class"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setDeleteClass(classItem)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                    title="Cancel class"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <span className="px-3 py-1 text-sm font-medium bg-amber-50 text-amber-700 rounded-full">
-                  {formatLevel(classItem.level)}
-                </span>
-              </div>
-
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-3 text-sm text-slate-600">
-                  <Calendar className="h-4 w-4" />
-                  <span className="font-medium">
-                    {(classItem.days_of_week?.length > 0
-                      ? classItem.days_of_week.map((d: number) => DAYS_OF_WEEK[d]).join(" / ")
-                      : DAYS_OF_WEEK[classItem.day_of_week]) ?? "TBD"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-slate-600">
-                  <Clock className="h-4 w-4" />
-                  <span className="font-mono">{formatTime(classItem.start_time)} – {formatTime(classItem.end_time)}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-slate-600">
-                  <Users className="h-4 w-4" />
-                  <span>
-                    <span className="font-semibold text-slate-900">{classItem.current_enrollment}</span>
-                    {" / "}{classItem.max_students} students
-                  </span>
-                </div>
-              </div>
-
-              {/* Enrollment bar */}
-              <div className="mb-4">
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all"
-                    style={{ width: `${Math.min((classItem.current_enrollment / classItem.max_students) * 100, 100)}%` }}
-                  />
-                </div>
-                <p className="text-xs text-slate-400 mt-1">{classItem.max_students - classItem.current_enrollment} spots remaining</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {classItem.start_date
-                    ? new Date(classItem.start_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-                    : "—"}
-                  {" → "}
-                  {classItem.end_date
-                    ? new Date(classItem.end_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-                    : "—"}
-                </p>
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                <div>
-                  <p className="text-xs text-slate-500">Tuition per session</p>
-                  <p className="text-lg font-bold font-mono text-slate-900">
-                    {formatCurrency(classItem.tuition_per_session)}{" "}
-                    <span className="text-sm font-normal text-slate-500">{classItem.currency}</span>
-                  </p>
-                </div>
-                <Button variant="outline" size="sm">View Details</Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {pages > 1 && (
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-600">
-              Showing {(page - 1) * perPage + 1} to {Math.min(page * perPage, total)} of {total} classes
-            </p>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
-                <ChevronLeft className="h-4 w-4" /> Previous
-              </Button>
-              <span className="text-sm font-mono text-slate-600">Page {page} of {pages}</span>
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page === pages}>
-                Next <ChevronRight className="h-4 w-4" />
-              </Button>
+      {/* ── SCHEDULE GRID VIEW ── */}
+      {view === "grid" && (
+        <div className="space-y-4">
+          <Card className="p-4">
+            <div className="flex items-center gap-2 text-sm text-slate-500 mb-3">
+              <Calendar className="h-4 w-4 text-amber-500" />
+              <span>Click any <span className="text-green-600 font-medium">empty slot</span> to create a class at that time · Click a <span className="text-amber-600 font-medium">class block</span> to edit it</span>
             </div>
-          </div>
-        </Card>
+            {loading ? (
+              <div className="text-center py-12 text-slate-400 animate-pulse">Loading schedule...</div>
+            ) : (
+              <ScheduleGrid
+                classes={gridClasses}
+                currentTeacherId={currentTeacherId}
+                isAdmin={isAdmin}
+                onClassClick={handleGridClassClick}
+                onSlotClick={handleSlotClick}
+              />
+            )}
+          </Card>
+        </div>
       )}
 
-      {/* Modals */}
-      <AddClassModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSuccess={fetchClasses}
-      />
+      {/* ── CARD VIEW ── */}
+      {view === "card" && (
+        <>
+          {/* Filters */}
+          <Card className="p-4">
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by class name or code..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                />
+                {search && (
+                  <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
 
-      <EditClassModal
-        classItem={editClass}
-        isOpen={!!editClass}
-        onClose={() => setEditClass(null)}
-        onSuccess={fetchClasses}
-      />
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
 
-      <DeleteConfirmDialog
-        isOpen={!!deleteClass}
-        onClose={() => setDeleteClass(null)}
-        onConfirm={handleDelete}
-        title={`Cancel "${deleteClass?.class_name ?? "class"}"?`}
-        description={`This will mark ${deleteClass?.class_name ?? "this class"} as cancelled. Enrollments and payment history are preserved.`}
-        confirmLabel="Cancel Class"
-      />
+              <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <option value="">All Levels</option>
+                {levels.map(l => <option key={l} value={l}>{l.replace(/_/g, " ").toUpperCase()}</option>)}
+              </select>
+
+              <select value={dayFilter} onChange={e => setDayFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <option value="">Any Day</option>
+                {DAY_NAMES.map((d, i) => <option key={i} value={i}>{d}</option>)}
+              </select>
+
+              <button
+                onClick={() => setShowCancelled(v => !v)}
+                className={`px-3 py-2 text-sm rounded-lg border transition-colors ${showCancelled ? "bg-slate-700 text-white border-slate-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+              >
+                {showCancelled ? "Hide Cancelled" : "Show Cancelled"}
+              </button>
+
+              {(search || statusFilter || levelFilter || dayFilter) && (
+                <Button variant="outline" size="sm" onClick={() => { setSearch(""); setStatusFilter(""); setLevelFilter(""); setDayFilter(""); }} className="gap-1">
+                  <X className="h-3 w-3" /> Clear
+                </Button>
+              )}
+            </div>
+          </Card>
+
+          {/* Class cards grid */}
+          {loading ? (
+            <div className="text-center py-12 text-slate-400 animate-pulse">Loading classes...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No classes match your filters</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filtered.map(cls => (
+                <ClassCard
+                  key={cls.id}
+                  cls={cls}
+                  isAdmin={isAdmin}
+                  isOwnClass={!!isOwnClass(cls)}
+                  onEdit={() => setEditClass(cls)}
+                  onCancel={() => setCancelClass(cls)}
+                  onDelete={() => setDeleteClass(cls)}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Modals ── */}
+      {showAddModal && (
+        <AddClassModal
+          isOpen={showAddModal}
+          onClose={() => { setShowAddModal(false); setPrefilledSlot(null); }}
+          onSuccess={fetchClasses}
+        />
+      )}
+
+      {editClass && (
+        <EditClassModal
+          isOpen={!!editClass}
+          class_={editClass}
+          onClose={() => setEditClass(null)}
+          onSuccess={fetchClasses}
+        />
+      )}
+
+      {cancelClass && (
+        <CancelClassDialog
+          cls={cancelClass}
+          onClose={() => setCancelClass(null)}
+          onConfirm={() => { setCancelClass(null); fetchClasses(); }}
+        />
+      )}
+
+      {deleteClass && (
+        <DeleteConfirmDialog
+          isOpen={!!deleteClass}
+          onClose={() => setDeleteClass(null)}
+          onConfirm={handleDeleteClass}
+          title={`Delete ${deleteClass?.class_name}?`}
+          description="This will permanently delete the class and all its enrollments. This cannot be undone."
+          confirmLabel="Delete Class"
+        />
+      )}
     </div>
   );
 }

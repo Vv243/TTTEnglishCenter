@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { teachersAPI } from "@/lib/api";
 import api from "@/lib/api";
+import { authStorage } from "@/lib/auth";
 import type { Teacher, ClassLevel } from "@/types";
 import { X } from "lucide-react";
 
@@ -97,13 +98,23 @@ export default function AddClassModal({ isOpen, onClose, onSuccess }: Props) {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const totalSessions = computeTotalSessions(form.start_date, form.end_date, form.days_of_week);
   const sessionsPerMonth = computeSessionsPerMonth(form.days_of_week);
 
   useEffect(() => {
     if (isOpen) {
-      teachersAPI.getAll({ is_active: true }).then((res) => setTeachers(res.items));
+      teachersAPI.getAll({ is_active: true }).then((res) => {
+        setTeachers(res.items);
+        // Auto-set teacher for non-admin users
+        const user = authStorage.getUser();
+        if (user?.role !== "admin" && user?.teacher_id) {
+          const myTeacher = res.items.find((t: any) => t.id === user.teacher_id);
+          if (myTeacher) set("teacher_id", myTeacher.id);
+        }
+      });
     }
   }, [isOpen]);
 
@@ -135,6 +146,32 @@ export default function AddClassModal({ isOpen, onClose, onSuccess }: Props) {
 
     setLoading(true);
     try {
+      // Conflict check before saving
+      if (form.teacher_id && form.room_number && form.days_of_week.length > 0) {
+        try {
+          const conflictRes = await api.post("/classes/check-conflict/", {
+            teacher_id: form.teacher_id,
+            room_number: form.room_number,
+            days_of_week: form.days_of_week,
+            start_time: form.start_time,
+            end_time: form.end_time,
+            exclude_class_id: null,
+          });
+          const { has_conflict, conflicts, warnings } = conflictRes.data;
+          if (has_conflict) {
+            setLoading(false);
+            setError("⚠️ Conflict: " + (conflicts as any[]).map((c) => c.message).join(" | "));
+            return;
+          }
+          if ((warnings as any[]).length > 0) {
+            const proceed = window.confirm("Warning:\n" + (warnings as any[]).map((w) => w.message).join("\n") + "\n\nContinue anyway?");
+            if (!proceed) { setLoading(false); return; }
+          }
+        } catch (conflictErr) {
+          console.warn("Conflict check failed, proceeding:", conflictErr);
+        }
+      }
+
       await api.post("/classes/", {
         ...form,
         day_of_week: form.days_of_week[0], // backward compat
@@ -198,6 +235,7 @@ export default function AddClassModal({ isOpen, onClose, onSuccess }: Props) {
               </div>
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Teacher <span className="text-red-500">*</span></label>
+                {isAdmin ? (
                 <select
                   value={form.teacher_id}
                   onChange={(e) => set("teacher_id", e.target.value)}
@@ -208,6 +246,12 @@ export default function AddClassModal({ isOpen, onClose, onSuccess }: Props) {
                     <option key={t.id} value={t.id}>{t.full_name} ({t.role})</option>
                   ))}
                 </select>
+              ) : (
+                <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-700">
+                  {teachers.find(t => t.id === form.teacher_id)?.full_name || currentUser?.full_name || currentUser?.username || "You"}
+                  <span className="ml-2 text-xs text-slate-400">(assigned to you)</span>
+                </div>
+              )}
               </div>
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Level <span className="text-red-500">*</span></label>
