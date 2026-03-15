@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { X, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { classesAPI, teachersAPI } from "@/lib/api";
+import api from "@/lib/api";
+import { authStorage } from "@/lib/auth";
 import type { Class, Teacher } from "@/types";
 
 const CLASS_LEVELS = [
@@ -97,6 +99,12 @@ export default function EditClassModal({ classItem, isOpen, onClose, onSuccess }
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const user = authStorage.getUser();
+    setIsAdmin(user?.role === "admin");
+  }, []);
 
   useEffect(() => {
     teachersAPI.getAll({ is_active: true, per_page: 50 }).then((r) => setTeachers(r.items));
@@ -170,6 +178,32 @@ export default function EditClassModal({ classItem, isOpen, onClose, onSuccess }
       if (form.end_date)             payload.end_date    = form.end_date;
       if (form.total_sessions)       payload.total_sessions = Number(form.total_sessions);
       if (form.description)          payload.description = form.description.trim();
+
+      // Conflict check before saving
+      if (form.teacher_id && form.room && selectedDays.length > 0 && form.start_time && form.end_time) {
+        try {
+          const conflictRes = await api.post("/classes/check-conflict/", {
+            teacher_id: form.teacher_id,
+            room_number: form.room.trim(),
+            days_of_week: selectedDays,
+            start_time: form.start_time,
+            end_time: form.end_time,
+            exclude_class_id: classItem.id,
+          });
+          const { has_conflict, conflicts, warnings } = conflictRes.data;
+          if (has_conflict) {
+            setSaving(false);
+            setApiError("⚠️ Conflict: " + (conflicts as any[]).map((c) => c.message).join(" | "));
+            return;
+          }
+          if ((warnings as any[]).length > 0) {
+            const proceed = window.confirm("Warning:\n" + (warnings as any[]).map((w) => w.message).join("\n") + "\n\nContinue anyway?");
+            if (!proceed) { setSaving(false); return; }
+          }
+        } catch (conflictErr) {
+          console.warn("Conflict check failed, proceeding:", conflictErr);
+        }
+      }
 
       await classesAPI.update(classItem.id, payload);
       onSuccess();
@@ -252,11 +286,24 @@ export default function EditClassModal({ classItem, isOpen, onClose, onSuccess }
 
           <Section title="Teachers">
             <Field label="Main Teacher" required error={errors.teacher_id}>
-              <select value={form.teacher_id} onChange={(e) => set("teacher_id", e.target.value)}
-                className={inputCls(!!errors.teacher_id)}>
-                <option value="">Select teacher...</option>
-                {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
-              </select>
+              {isAdmin ? (
+                <select
+                  id="teacher"
+                  value={form.teacher_id}
+                  onChange={(e) => set("teacher_id", e.target.value)}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 ${errors.teacher_id ? "border-red-400 bg-red-50" : "border-slate-300 bg-white"}`}
+                >
+                  <option value="">Select teacher...</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.full_name}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {teachers.find(t => t.id === form.teacher_id)?.full_name || "You"}
+                  <span className="ml-2 text-xs text-slate-400">(assigned to you)</span>
+                </div>
+              )}
             </Field>
             <Field label="Assistant Teacher (optional)">
               <select value={form.assistant_teacher_id} onChange={(e) => set("assistant_teacher_id", e.target.value)}

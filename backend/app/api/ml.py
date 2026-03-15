@@ -174,7 +174,7 @@ async def attendance_summary(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Enrollment, Student)
         .join(Student, Enrollment.student_id == Student.id)
-        .where(Enrollment.status == "active")
+        .where(Enrollment.status == "enrolled")
     )
     all_enrollments = result.all()
 

@@ -130,7 +130,7 @@ function ClassRosterCard({ cls, onRefresh }: ClassRosterCardProps) {
             </div>
             <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
               <span>{days} · {cls.start_time}–{cls.end_time}</span>
-              {cls.room_number && <span>Room {cls.room_number}</span>}
+              {cls.room_number && <span>📍 {cls.room_number}</span>}
             </div>
           </div>
         </div>
@@ -138,14 +138,14 @@ function ClassRosterCard({ cls, onRefresh }: ClassRosterCardProps) {
           {/* Counts */}
           <div className="flex items-center gap-3 text-xs">
             <span className="flex items-center gap-1 text-green-600">
-              <CheckCircle className="h-3 w-3" /> {enrolled} enrolled
+              <CheckCircle className="h-3 w-3" /> {expanded ? enrolled : cls.current_enrollment} enrolled
             </span>
-            {pending > 0 && (
+            {(expanded ? pending : 0) > 0 && (
               <span className="flex items-center gap-1 text-amber-600">
                 <Clock className="h-3 w-3" /> {pending} pending
               </span>
             )}
-            {waitlist > 0 && (
+            {(expanded ? waitlist : 0) > 0 && (
               <span className="flex items-center gap-1 text-slate-500">
                 <AlertCircle className="h-3 w-3" /> {waitlist} waitlisted
               </span>
@@ -357,6 +357,8 @@ export default function EnrollmentsPage() {
   useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
   const enrollments = (data?.items || []).filter((e) => {
+    // Hide withdrawn by default unless explicitly filtered
+    if (!filters.status && e.status === "withdrawn") return false;
     if (filters.search) {
       const q = filters.search.toLowerCase();
       const matchesStudent = e.student?.full_name?.toLowerCase().includes(q);

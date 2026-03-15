@@ -240,7 +240,7 @@ export default function ClassesPage() {
     setIsAdmin(user?.role === "admin");
     if (user?.role !== "admin") {
       // Get teacher_id for current user
-      api.get("/auth/me/").then(r => {
+      api.get("/auth/me").then(r => {
         setCurrentTeacherId(r.data.teacher_id);
       }).catch(() => {});
     }
@@ -455,7 +455,7 @@ export default function ClassesPage() {
       {editClass && (
         <EditClassModal
           isOpen={!!editClass}
-          class_={editClass}
+          classItem={editClass}
           onClose={() => setEditClass(null)}
           onSuccess={fetchClasses}
         />

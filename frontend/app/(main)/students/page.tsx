@@ -96,6 +96,7 @@ export default function StudentsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editStudent, setEditStudent] = useState<Student | null>(null);
   const [deleteStudent, setDeleteStudent] = useState<Student | null>(null);
+  const [reactivateStudent, setReactivateStudent] = useState<Student | null>(null);
 
   const perPage = 10;
 
@@ -163,6 +164,13 @@ export default function StudentsPage() {
   const handleDelete = async () => {
     if (!deleteStudent) return;
     await studentsAPI.delete(deleteStudent.id);
+    fetchStudents();
+  };
+
+  const handleReactivate = async () => {
+    if (!reactivateStudent) return;
+    await studentsAPI.update(reactivateStudent.id, { is_active: true } as any);
+    setReactivateStudent(null);
     fetchStudents();
   };
 
@@ -438,7 +446,13 @@ export default function StudentsPage() {
                             </>
                           )}
                           {!student.is_active && (
-                            <span className="text-xs text-slate-400 italic">Inactive</span>
+                            <button
+                              onClick={() => setReactivateStudent(student)}
+                              className="text-xs px-2 py-1 bg-green-50 text-green-600 border border-green-200 rounded-lg hover:bg-green-100 transition-colors font-medium"
+                              title="Reactivate student"
+                            >
+                              Reactivate
+                            </button>
                           )}
                         </div>
                       </td>
@@ -505,6 +519,15 @@ export default function StudentsPage() {
         title={`Deactivate ${deleteStudent?.full_name ?? "student"}?`}
         description={`This will mark ${deleteStudent?.full_name ?? "this student"} as inactive and withdraw them from all active classes. Their payment history will be preserved.`}
         confirmLabel="Deactivate Student"
+      />
+
+      <DeleteConfirmDialog
+        isOpen={!!reactivateStudent}
+        onClose={() => setReactivateStudent(null)}
+        onConfirm={handleReactivate}
+        title={`Reactivate ${reactivateStudent?.full_name ?? "student"}?`}
+        description={`This will mark ${reactivateStudent?.full_name ?? "this student"} as active again. They will need to be re-enrolled in classes manually.`}
+        confirmLabel="Reactivate Student"
       />
     </div>
   );
