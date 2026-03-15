@@ -20,7 +20,9 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
-        run: pip install pytest
+        run: pip install pytest pytest-asyncio
 
       - name: Run unit tests
-        run: pytest backend/tests/test_educore.py -v --tb=short --no-header -p no:asyncio
+        run: pytest backend/tests/test_educore.py -v --tb=short
+        env:
+          PYTHONDONTWRITEBYTECODE: 1
