@@ -20,11 +20,7 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
-        run: |
-          cd backend
-          pip install pytest pytest-asyncio
+        run: pip install pytest
 
       - name: Run unit tests
-        run: |
-          cd backend
-          pytest tests/test_educore.py -v --tb=short
+        run: pytest backend/tests/test_educore.py -v --tb=short --no-header -p no:asyncio
