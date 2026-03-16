@@ -31,9 +31,12 @@ export const authStorage = {
 }
 
 export async function loginRequest(username: string, password: string) {
+  const formData = new FormData()
+  formData.append('username', username)
+  formData.append('password', password)
   const res = await fetch(
-    `${API_URL}/api/v1/auth/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
-    { method: 'POST' }
+    `${API_URL}/api/v1/auth/login`,
+    { method: 'POST', body: formData }
   )
   if (!res.ok) {
     const err = await res.json()
