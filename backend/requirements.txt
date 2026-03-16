@@ -34,5 +34,5 @@ twilio
 python-constraint
 
 # ML packages (uncomment when ready for Days 6-9)
-# scikit-learn
+scikit-learn
 # prophet
