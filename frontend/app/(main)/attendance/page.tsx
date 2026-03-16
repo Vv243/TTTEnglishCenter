@@ -1,7 +1,7 @@
 "use client";
+export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, Suspense, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -423,7 +423,12 @@ function SessionView({
 
 // ── Main Attendance Page ──────────────────────────────────────
 export default function AttendancePage() {
-  const searchParams = useSearchParams();
+  const searchParams = {
+    get: (key: string) => {
+      if (typeof window === "undefined") return null;
+      return new URLSearchParams(window.location.search).get(key);
+    }
+  };
 
   const [selectedDate, setSelectedDate] = useState(
     searchParams.get("date") || todayStr()

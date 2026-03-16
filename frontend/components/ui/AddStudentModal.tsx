@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { studentsAPI } from "@/lib/api";
+import type { GradeLevel } from "@/types";
 
 interface AddStudentModalProps {
   isOpen: boolean;
@@ -144,7 +145,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStude
       await studentsAPI.create({
         full_name:     form.full_name.trim(),
         date_of_birth: form.date_of_birth,
-        grade_level:   form.grade_level,
+        grade_level:   form.grade_level as GradeLevel,
         parent_name:   form.parent_name.trim(),
         parent_phone:  form.parent_phone.trim(),
         parent_email:  form.parent_email.trim() || null,

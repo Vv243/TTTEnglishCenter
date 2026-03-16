@@ -145,6 +145,7 @@ export interface Enrollment {
   class?: Class;
   enrollment_date: string;
   status: EnrollmentStatus;
+  waitlist_position?: number | null;
   agreed_tuition_per_session: number;
   discount_percent: number;
   attendance_rate: number | null;

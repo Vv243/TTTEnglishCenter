@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { studentsAPI } from "@/lib/api";
+import type { GradeLevel } from "@/types";
 import type { Student } from "@/types";
 
 const GRADE_LEVELS = [

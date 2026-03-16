@@ -1,5 +1,5 @@
 "use client";
-
+export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -8,8 +8,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { statsAPI } from "@/lib/api";
+import { authStorage, AuthUser } from "@/lib/auth";
 import api from "@/lib/api";
-import { authStorage } from "@/lib/auth";
 import type { StatsSummary, DashboardStats } from "@/types";
 import {
   Users, GraduationCap, BookOpen, UserCircle,
@@ -52,7 +52,7 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<DashboardStats | null>(null);
   const [todayClasses, setTodayClasses] = useState<TodayClass[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<{ username: string; role: string; full_name?: string } | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
     const u = authStorage.getUser();

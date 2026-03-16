@@ -1,5 +1,5 @@
 "use client";
-
+export const dynamic = "force-dynamic";
 import AddStudentModal from "@/components/ui/AddStudentModal";
 import EditStudentModal from "@/components/ui/EditStudentModal";
 import DeleteConfirmDialog from "@/components/ui/DeleteConfirmDialog";

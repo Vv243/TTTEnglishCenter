@@ -1,12 +1,17 @@
-'use client'
-
-import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+"use client";
+export const dynamic = "force-dynamic";
+import { useState, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 import { authStorage, loginRequest } from '@/lib/auth'
 
 export default function LoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
+  const searchParams = {
+    get: (key: string) => {
+      if (typeof window === "undefined") return null;
+      return new URLSearchParams(window.location.search).get(key);
+    }
+  };
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
