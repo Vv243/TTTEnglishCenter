@@ -35,7 +35,7 @@ export async function loginRequest(username: string, password: string) {
   formData.append('username', username)
   formData.append('password', password)
   const res = await fetch(
-    `${API_URL}/api/v1/auth/login`,
+    `${API_URL}/auth/login`,
     { method: 'POST', body: formData }
   )
   if (!res.ok) {
@@ -49,7 +49,7 @@ export async function refreshToken(): Promise<boolean> {
   const token = authStorage.getToken()
   if (!token) return false
   try {
-    const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` }
     })
