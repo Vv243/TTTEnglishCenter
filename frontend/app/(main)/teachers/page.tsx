@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AddTeacherModal from "@/components/ui/AddTeacherModal";
+import TeacherDetailModal from "@/components/ui/TeacherDetailModal";
 import { teachersAPI } from "@/lib/api";
 import type { Teacher } from "@/types";
 import { Mail, Phone, MessageCircle, Search, X } from "lucide-react";
@@ -18,6 +19,7 @@ export default function TeachersPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
 
   useEffect(() => {
     const user = authStorage.getUser();
@@ -154,7 +156,7 @@ export default function TeachersPage() {
               ) : (
                 filtered.map((teacher, index) => (
                   <tr
-                    key={teacher.id}
+                    key={teacher.id} onClick={() => setSelectedTeacher(teacher)} style={{cursor: "pointer"}}
                     className="hover:bg-slate-50 transition-colors animate-fade-in"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
@@ -226,6 +228,13 @@ export default function TeachersPage() {
         </div>
       </Card>
 
+      {/* Teacher Detail Modal */}
+      <TeacherDetailModal
+        teacher={selectedTeacher}
+        isOpen={!!selectedTeacher}
+        onClose={() => setSelectedTeacher(null)}
+        isAdmin={isAdmin}
+      />
       {/* Add Teacher Modal */}
       <AddTeacherModal
         isOpen={showAddModal}
