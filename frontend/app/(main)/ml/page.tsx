@@ -163,10 +163,10 @@ export default function MLInsightsPage() {
 
   if (!data) return <div className="text-slate-500">Failed to load ML data.</div>;
 
-  const displayed = activeTab === "at-risk" ? data.at_risk_students : data.predictions;
-  const safeCount = data.total_enrollments - data.at_risk_count;
-  const avgPredicted = data.predictions.length
-    ? Math.round(data.predictions.reduce((s, p) => s + p.predicted_attendance, 0) / data.predictions.length)
+  const displayed = activeTab === "at-risk" ? (data.at_risk_students ?? []) : (data.predictions ?? []);
+  const safeCount = (data.total_enrollments ?? 0) - (data.at_risk_count ?? 0);
+  const avgPredicted = (data.predictions ?? []).length
+    ? Math.round((data.predictions ?? []).reduce((s, p) => s + p.predicted_attendance, 0) / data.predictions.length)
     : 0;
 
   return (
