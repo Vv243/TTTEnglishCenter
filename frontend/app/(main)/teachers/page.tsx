@@ -156,7 +156,7 @@ export default function TeachersPage() {
               ) : (
                 filtered.map((teacher, index) => (
                   <tr
-                    key={teacher.id} onClick={() => setSelectedTeacher(teacher)} style={{cursor: "pointer"}}
+                    key={teacher.id} onClick={() => setSelectedTeacher(teacher)} className="cursor-pointer"
                     className="hover:bg-slate-50 transition-colors animate-fade-in"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
