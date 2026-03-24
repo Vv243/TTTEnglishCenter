@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { X, Lock, Eye, EyeOff, KeyRound, User, Mail, Phone, MessageCircle, BookOpen } from "lucide-react";
+import { X, Lock, Eye, EyeOff, KeyRound, Mail, Phone, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import api from "@/lib/api";
@@ -46,7 +46,6 @@ export default function TeacherDetailModal({ teacher, isOpen, onClose, isAdmin }
     }
     setLoading(true);
     try {
-      // Find the user account linked to this teacher
       await api.post(`/auth/reset-teacher-password/`, {
         teacher_id: teacher.id,
         new_password: newPassword,
@@ -65,7 +64,6 @@ export default function TeacherDetailModal({ teacher, isOpen, onClose, isAdmin }
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold text-lg">
@@ -83,9 +81,7 @@ export default function TeacherDetailModal({ teacher, isOpen, onClose, isAdmin }
           </button>
         </div>
 
-        {/* Body */}
         <div className="p-6 space-y-4">
-          {/* Contact Info */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Contact</h3>
             {teacher.email && (
@@ -108,7 +104,6 @@ export default function TeacherDetailModal({ teacher, isOpen, onClose, isAdmin }
             )}
           </div>
 
-          {/* Specializations */}
           {teacher.specializations?.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Specializations</h3>
@@ -122,15 +117,6 @@ export default function TeacherDetailModal({ teacher, isOpen, onClose, isAdmin }
             </div>
           )}
 
-          {/* Bio */}
-          {teacher.bio && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Bio</h3>
-              <p className="text-sm text-slate-600">{teacher.bio}</p>
-            </div>
-          )}
-
-          {/* Password Reset — Admin only */}
           {isAdmin && (
             <div className="pt-2 border-t border-slate-100">
               {!showResetForm ? (
@@ -170,7 +156,7 @@ export default function TeacherDetailModal({ teacher, isOpen, onClose, isAdmin }
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
                   />
                   {error && <p className="text-red-500 text-sm">{error}</p>}
-                  {success && <p className="text-green-600 text-sm">{success}</p>}
+                  {success && <p className="text-green-600 text-sm font-medium">✓ {success}</p>}
                   <div className="flex gap-2">
                     <Button onClick={handleResetPassword} disabled={loading} size="sm" className="bg-amber-500 hover:bg-amber-400 text-white">
                       {loading ? "Resetting..." : "Reset Password"}
