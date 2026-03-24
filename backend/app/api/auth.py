@@ -87,3 +87,26 @@ async def change_password(
     current_user.hashed_password = hash_password(payload.new_password)
     await db.commit()
     return {"message": "Password changed successfully"}
+
+
+class ResetTeacherPasswordRequest(_PydanticBase):
+    teacher_id: str
+    new_password: str
+
+@router.post("/reset-teacher-password/")
+async def reset_teacher_password(
+    payload: ResetTeacherPasswordRequest,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin-only: reset a teacher's password by teacher_id"""
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    # Find user account linked to this teacher
+    result = await db.execute(select(User).where(User.teacher_id == payload.teacher_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="No user account found for this teacher")
+    user.hashed_password = hash_password(payload.new_password)
+    await db.commit()
+    return {"message": "Password reset successfully"}
